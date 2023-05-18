@@ -14,6 +14,14 @@
 ## Adaptor handling, mapping, quality trimming, and converting to bed
 
 ## Sorting, filtering, calculating length dist., filtering damage-seq samples by motif, producing bigwig files
+### Sorting BED files
+The BED files are sorted according to genomic coordinates of the reads.
+
+> sort -k1,1 -k2,2n -k3,3n ${SAMPLE}.bed > ${SAMPLE}_sorted.bed
+
+### Obtaining read length distribution and read count
+Checking the 
+
 
 ## Simulating the sample reads
 
