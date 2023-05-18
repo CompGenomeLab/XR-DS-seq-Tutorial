@@ -8,7 +8,7 @@
 ## Introduction to R, Python, Bash (whichever is necessary)
 
 ## Downloading reference genome and generating related files 
-
+The reference genome of the interested species 
 ## Quality control
 
 ## Adaptor handling, mapping, quality trimming, and converting to bed
