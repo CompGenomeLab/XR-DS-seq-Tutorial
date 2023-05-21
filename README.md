@@ -70,13 +70,12 @@ Due to the experimental protocol of Damage-seq, the damaged dipyrimidines are lo
 To convert BED files to FASTA format:
     
     bedtools getfasta \
-        -fi GRCh38.fa \
+        -fi ref_genome/GRCh38.fa \
         -bed hela_ds_cpd_sorted_chr_plus_10.bed \
         -fo hela_ds_cpd_sorted_plus_10.fa \
         -s
-
     bedtools getfasta \
-        -fi GRCh38.fa \
+        -fi ref_genome/GRCh38.fa \
         -bed hela_ds_cpd_sorted_chr_minus_10.bed \
         -fo hela_ds_cpd_sorted_minus_10.fa \
         -s
@@ -163,18 +162,68 @@ Then, from these BedGraph files, we generate BigWig files.
     sort -k1,1 -k2,2n hela_xr_cpd_sorted_chr_minus.bdg > \
         hela_xr_cpd_sorted_chr_minus_sorted.bdg
     
-    bedGraphToBigWig hela_ds_cpd_sorted_ds_dipyrimidines_plus_sorted.bdg
+    bedGraphToBigWig hela_ds_cpd_sorted_ds_dipyrimidines_plus_sorted.bdg \
+        ref_genome/GRCh38.fa.fai \
+        hela_ds_cpd_sorted_ds_dipyrimidines_plus.bw
+    bedGraphToBigWig hela_ds_cpd_sorted_ds_dipyrimidines_minus_sorted.bdg \
+        ref_genome/GRCh38.fa.fai \
+        hela_ds_cpd_sorted_ds_dipyrimidines_minus.bw
+
+    bedGraphToBigWig hela_xr_cpd_sorted_chr_plus_sorted.bdg \
+        ref_genome/GRCh38.fa.fai \
+        hela_xr_cpd_sorted_chr_plus.bw
+    bedGraphToBigWig hela_xr_cpd_sorted_chr_minus_sorted.bdg \
+        ref_genome/GRCh38.fa.fai \
+        hela_xr_cpd_sorted_chr_minus.bw
 
 ## Simulating the sample reads
-Because CPD and (6-4)PP damage types require certain nucleotides in certain positions, the genomic locations rich in adjacent CC, TC, CT or TT dinucleotides may be prone to receiving more UV damage while other regions that are poor in these dinucleotides receive less damage. Therefore, the sequence contents may bias our analysis results while comparing the damage formation or NER efficiency of two genomic regions. In order to eliminate the effect of  sequence content, we create synthetic sequencing data from the real Damage-seq and XR-seq data, which give us the expected damage counts and NER efficiencies, respectively, from the sequence content of the genomic areas of interest.
+Because CPD and (6-4)PP damage types require certain nucleotides in certain positions, the genomic locations rich in adjacent CC, TC, CT or TT dinucleotides may be prone to receiving more UV damage while other regions that are poor in these dinucleotides receive less damage. Therefore, the sequence contents may bias our analysis results while comparing the damage formation or NER efficiency of two genomic regions. In order to eliminate the effect of  sequence content, we create synthetic sequencing data from the real Damage-seq and XR-seq data, which give us the expected damage counts and NER efficiencies, respectively, from the sequence content of the genomic areas of interest. We use [Boquila](https://github.com/CompGenomeLab/boquila) to generate simulated data.
 
+    bedtools getfasta \
+        -fi ref_genome/GRCh38.fa \
+        -bed hela_ds_cpd_sorted_ds_dipyrimidines.bed \
+        -fo hela_ds_cpd_sorted_ds_dipyrimidines.fa \
+        -s
+
+    bedtools getfasta \
+        -fi ref_genome/GRCh38.fa \
+        -bed hela_xr_cpd_sorted_chr.bed \
+        -fo hela_xr_cpd_sorted_chr.fa \
+        -s
+
+```
+    boquila \
+        --fasta hela_ds_cpd_sorted_ds_dipyrimidines.fa \
+        --bed hela_ds_cpd_sorted_ds_dipyrimidines_sim.bed \
+        --ref ref_genome/GRCh38.fa \
+        --regions ref_genome/GRCh38.ron \
+        --kmer 2 \
+        --seed 1 \
+        --sens 2 > \
+        hela_ds_cpd_sorted_ds_dipyrimidines_sim.fa
+
+    boquila \
+        --fasta hela_xr_cpd_sorted_chr.fa \
+        --bed hela_xr_cpd_sorted_chr_sim.bed \
+        --ref ref_genome/GRCh38.fa \
+        --regions ref_genome/GRCh38.ron \
+        --kmer 2 \
+        --seed 1 \
+        --sens 2 > \
+        hela_xr_cpd_sorted_chr_sim.fa
+
+```
+    awk '{if($6=="+"){print}}' hela_ds_cpd_sorted_ds_dipyrimidines_sim.bed > \
+        hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus.bed
+    awk '{if($6=="-"){print}}' hela_ds_cpd_sorted_ds_dipyrimidines_sim.bed > \
+        hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus.bed
+
+    awk '{if($6=="+"){print}}' hela_xr_cpd_sorted_chr_sim.bed > \
+        hela_xr_cpd_sorted_chr_sim_plus.bed
+    awk '{if($6=="-"){print}}' hela_xr_cpd_sorted_chr_sim.bed > \
+        hela_xr_cpd_sorted_chr_sim_minus.bed
+        
 The read counts from the simulated Damage-seq and XR-seq data are then used to normalize our real Damage-seq and XR-seq data to eliminate the sequence content bias. 
-
-[Boquila github link]
-
-    boquila
-
-
 ## Plotting length distribution, nucleotide enrichment, and bam correlations
 
 ### Plotting read length distribution
