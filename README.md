@@ -169,7 +169,7 @@ We create a histogram of the read length distribution to clearly understand whic
         geom_bar(stat='identity') +
         xlab("Read length") +
         ylab("Read count")
-    ggsave("xrLenDistPlot.png")
+    ggsave("results/xrLenDistPlot.png")
 
 ### Plotting nucleotide enrichment of the reads
 
@@ -177,15 +177,16 @@ Since the reads from Damage-seq and XR-seq data are expected to contain C and T 
 
     R
     library(ggplot2)
-    nucl_content <- read.table("results/hela_ds_cpd_sorted_ds_dipyrimidines_nucleotideTable.txt")
+    nucl_content <- read.table("results/hela_xr_cpd_sorted_chr_nucleotideTable.txt")
     nucl_content_gathered <- gather(nucl_content, nucl, count, -kmer)
     nucl_content_gathered$kmer <- factor(nucl_content_gathered$kmer, levels = c("C", "T", "G", "A"))
-    ggplot(data = nucl_content_gathered, aes(x = nucl, y = count, fill = kmer)) +
-    geom_bar(position = "fill", stat='identity') +
-    xlab("Position") +
-    ylab("Count") +
-    labs(fill = "") +
-    scale_fill_manual(values = c("seagreen3","gray60", "steelblue2", "steelblue4"))
+    xrNuclPlot <- ggplot(data = nucl_content_gathered, aes(x = nucl, y = count, fill = kmer)) +
+        geom_bar(position = "fill", stat='identity') +
+        xlab("Position") +
+        ylab("Count") +
+        labs(fill = "") +
+        scale_fill_manual(values = c("seagreen3","gray60", "steelblue2", "steelblue4"))
+    ggsave("results/xrNuclPlot.png")
 
 
 ### Bam correlations
