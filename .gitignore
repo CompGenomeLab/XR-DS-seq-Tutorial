@@ -162,3 +162,12 @@ cython_debug/
 # Ignore raw samples
 samples/HXACA4_TGACCA.fastq
 samples/HDACA6_GCCAAT.fastq
+
+.DS_Store
+
+# Ignore results
+results/
+!results/README.md
+qc/
+ref_genome/
+!ref_genome/Bowtie2/README.md
