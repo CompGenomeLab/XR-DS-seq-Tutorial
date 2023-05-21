@@ -169,5 +169,5 @@ samples/HDACA6_GCCAAT.fastq
 results/
 !results/README.md
 qc/
-ref_genome/
+ref_genome/*
 !ref_genome/Bowtie2/README.md
