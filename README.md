@@ -34,11 +34,15 @@ Reads that are aligned to regions other than chromosomes 1-22 and X are filtered
 ### Separating strands
 The reads in the BED files are separated according to which strand they were mapped on.
 ```
-    awk '{if($6=="+"){print}}' hela_ds_cpd_sorted_chr.bed > hela_ds_cpd_sorted_chr_plus.bed
-    awk '{if($6=="-"){print}}' hela_ds_cpd_sorted_chr.bed > hela_ds_cpd_sorted_chr_minus.bed
+    awk '{if($6=="+"){print}}' hela_ds_cpd_sorted_chr.bed > \
+        hela_ds_cpd_sorted_chr_plus.bed
+    awk '{if($6=="-"){print}}' hela_ds_cpd_sorted_chr.bed > \
+        hela_ds_cpd_sorted_chr_minus.bed
 
-    awk '{if($6=="+"){print}}' hela_xr_cpd_sorted_chr.bed > hela_xr_cpd_sorted_chr_plus.bed
-    awk '{if($6=="-"){print}}' hela_xr_cpd_sorted_chr.bed > hela_xr_cpd_sorted_chr_minus.bed
+    awk '{if($6=="+"){print}}' hela_xr_cpd_sorted_chr.bed > \
+        hela_xr_cpd_sorted_chr_plus.bed
+    awk '{if($6=="-"){print}}' hela_xr_cpd_sorted_chr.bed > \
+        hela_xr_cpd_sorted_chr_minus.bed
 ```
 
 ### Centering the damage site in for Damage-seq reads
@@ -68,33 +72,34 @@ To convert BED files to FASTA format:
     bedtools getfasta \
         -fi GRCh38.fa \
         -bed hela_ds_cpd_sorted_chr_plus_10.bed \
-        -fo hela_ds_cpd_sorted_chr_plus_10.fa \
+        -fo hela_ds_cpd_sorted_plus_10.fa \
         -s
 
     bedtools getfasta \
         -fi GRCh38.fa \
         -bed hela_ds_cpd_sorted_chr_minus_10.bed \
-        -fo hela_ds_cpd_sorted_chr_minus_10.fa \
+        -fo hela_ds_cpd_sorted_minus_10.fa \
         -s
-    
-    cat hela_ds_cpd_sorted_chr_plus_10.fa \
-        hela_ds_cpd_sorted_chr_minus_10.fa > \
-        hela_ds_cpd_10.fa
 
 ### Filtering Damage-seq data by motif
 Damage-seq reads are expected to contain C and T nucleotides at certain position due to the nature of the NER and Damage-seq experimental protocol. Therefore, we use this as an additional filtering step to eliminate the reads that don’t fit this criteria.
 
-    python3 scripts/fa2bedByChoosingReadMotifs.py hela_ds_cpd_10.fa
+    python3 scripts/fa2bedByChoosingReadMotifs.py hela_ds_cpd_sorted_plus_10.fa
+    python3 scripts/fa2bedByChoosingReadMotifs.py hela_ds_cpd_sorted_minus_10.fa
+
+    cat hela_ds_cpd_sorted_ds_dipyrimidines_plus.bed \   
+        hela_ds_cpd_sorted_ds_dipyrimidines_minus.bed > \
+        hela_ds_cpd_sorted_ds_dipyrimidines.bed
 
 ### Obtaining read length distribution and read count
 In order see if our data contains the reads with lengths expected from the XR-seq or Damage-seq methods, read length distribution of the data should be extracted.
 
-    awk '{{print $3-$2}}' hela_ds_cpd_sorted_chr_10.bed \
+    awk '{{print $3-$2}}' hela_ds_cpd_sorted_ds_dipyrimidines.bed \
         sort -k1,1n \
         uniq -c \
         sed 's/\s\s*/ /g' \
         awk '{{print $2"\\t"$1}}' > \
-        hela_ds_cpd_sorted_10_ReadLengthDist.txt
+        hela_ds_cpd_sorted_ds_dipyrimidines_ReadLengthDist.txt
 
     awk '{{print $3-$2}}' hela_xr_cpd_sorted_chr.bed \&
         sort -k1,1n \& 
@@ -105,19 +110,60 @@ In order see if our data contains the reads with lengths expected from the XR-se
 
 In addition, we count the reads in the BED files and use this count in the following steps. 
 
-    grep -c "^" hela_ds_cpd_sorted_chr_10.bed > hela_ds_cpd_sorted_chr_10_readCount.txt
+    grep -c "^" hela_ds_cpd_sorted_ds_dipyrimidines.bed > hela_ds_cpd_sorted_ds_dipyrimidines_readCount.txt
     grep -c "^" hela_xr_cpd_sorted_chr.bed > hela_xr_cpd_sorted_chr_readCount.txt
 
+### Assessing dinucleotide content
+
+
+    fa2kmerAbundanceTable.py 
 ### Generating BigWig files
 
 BigWig file format includes representation of the distribution reads in each genomic window without respect to plus and minus strands. It is a compact file format that is required for many tools in the further analysis steps. 
 
 The first step for generation of BigWig files from BED files is generating BedGraph files. Since the strands of the reads are not taken into account in the BigWig and BedGraph files
 
->
+    bedtools genomecov -i hela_ds_cpd_sorted_ds_dipyrimidines_plus.bed \
+        -g ref_genome/GRCh38.fa.fai \
+        -bg -scale \
+        $(cat hela_ds_cpd_sorted_ds_dipyrimidines_readCount.txt | \
+        awk '{print 1000000/$1}') > \
+        hela_ds_cpd_sorted_ds_dipyrimidines_plus.bdg
+    
+    bedtools genomecov -i hela_ds_cpd_sorted_ds_dipyrimidines_minus.bed \
+        -g ref_genome/GRCh38.fa.fai \
+        -bg -scale \
+        $(cat hela_ds_cpd_sorted_ds_dipyrimidines_readCount.txt | \
+        awk '{print 1000000/$1}') > \
+        hela_ds_cpd_sorted_ds_dipyrimidines_minus.bdg
 
-Then, from these Bedgraph files, we can generate BigWig files. 
+    bedtools genomecov -i hela_xr_cpd_sorted_chr_plus.bed \
+        -g ref_genome/GRCh38.fa.fai \
+        -bg -scale \
+        $(cat hela_xr_cpd_sorted_chr_readCount.txt | \
+        awk '{print 1000000/$1}') > \
+        hela_xr_cpd_sorted_chr_plus.bdg        
+    
+    bedtools genomecov -i hela_xr_cpd_sorted_chr_minus.bed \
+        -g ref_genome/GRCh38.fa.fai \
+        -bg -scale \
+        $(cat hela_xr_cpd_sorted_chr_readCount.txt | \
+        awk '{print 1000000/$1}') > \
+        hela_xr_cpd_sorted_chr_minus.bdg
 
+Then, from these BedGraph files, we generate BigWig files. 
+
+    sort -k1,1 -k2,2n hela_ds_cpd_sorted_ds_dipyrimidines_plus.bdg > \
+        hela_ds_cpd_sorted_ds_dipyrimidines_plus_sorted.bdg
+    sort -k1,1 -k2,2n hela_ds_cpd_sorted_ds_dipyrimidines_minus.bdg > \
+        hela_ds_cpd_sorted_ds_dipyrimidines_minus_sorted.bdg
+    
+    sort -k1,1 -k2,2n hela_xr_cpd_sorted_chr_plus.bdg > \
+        hela_xr_cpd_sorted_chr_plus_sorted.bdg
+    sort -k1,1 -k2,2n hela_xr_cpd_sorted_chr_minus.bdg > \
+        hela_xr_cpd_sorted_chr_minus_sorted.bdg
+    
+    bedGraphToBigWig hela_ds_cpd_sorted_ds_dipyrimidines_plus_sorted.bdg
 
 ## Simulating the sample reads
 Because CPD and (6-4)PP damage types require certain nucleotides in certain positions, the genomic locations rich in adjacent CC, TC, CT or TT dinucleotides may be prone to receiving more UV damage while other regions that are poor in these dinucleotides receive less damage. Therefore, the sequence contents may bias our analysis results while comparing the damage formation or NER efficiency of two genomic regions. In order to eliminate the effect of  sequence content, we create synthetic sequencing data from the real Damage-seq and XR-seq data, which give us the expected damage counts and NER efficiencies, respectively, from the sequence content of the genomic areas of interest.
