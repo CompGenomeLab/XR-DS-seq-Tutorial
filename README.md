@@ -143,41 +143,59 @@ This section demonstrates how to handle adaptors in the NGS data using Cutadapt,
 
 ```bash
 conda install -c bioconda cutadapt
+```
 
+At this stage, we will perform different tasks for Damage-seq and XR-seq.
+In Damage-seq we want to discard all the reads with adaptors
+since having the adaptor in Damage-seq reads mean that the read does not contain any damage.
+In the case of XR-seq, we will only trim the adaptors from the reads and keep the trimmed ones.
+
+```bash
 cutadapt -j 8 -g GACTGGTTCCAATTGAAAGTGCTCTTCCGATCT --discard-trimmed -o results/hela_ds_cpd_cutadapt.fq samples/hela_ds_cpd.fq > hela_ds_cpd_cutadapt.log
 
 cutadapt -j 8 -a TGGAATTCTCGGGTGCCAAGGAACTCCAGTNNNNNNACGATCTCGTATGCCGTCTTCTGCTTG -o results/hela_xr_cpd_cutadapt.fq samples/hela_xr_cpd.fq > hela_xr_cpd_cutadapt.log
 ```
 
-## Mapping, quality trimming, and converting to bed
+## Mapping, removing duplicates, quality trimming, and converting to bed
 
 This section covers the steps involved in mapping the preprocessed reads to the reference genome using Bowtie2, converting the mapped reads to BAM format, and extracting BED files.
 
+Initially we will align our reads to the reference genome using the prepared index files.
+After that we will convert the output sam files to bam.
+
 ```bash
 (bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_GRCh38 -U results/hela_ds_cpd_cutadapt.fq -S results/hela_ds_cpd_cutadapt.sam) > hela_ds_cpd_cutadapt_align.log 2>&1
+
 samtools view -Sbh -o results/hela_ds_cpd_cutadapt.bam results/hela_ds_cpd_cutadapt.sam
 
 (bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_GRCh38 -U results/hela_xr_cpd_cutadapt.fq -S results/hela_xr_cpd_cutadapt.sam) > hela_xr_cpd_cutadapt_align.log 2>&1
+
 samtools view -Sbh -o results/hela_xr_cpd_cutadapt.bam results/hela_xr_cpd_cutadapt.sam
 ```
 
-```bash
-samtools view -H results/hela_ds_cpd_cutadapt.bam | grep -v "^@PG" > results/hela_ds_cpd_cutadapt_headers.txt
-samtools reheader results/hela_ds_cpd_cutadapt_headers.txt results/hela_ds_cpd_cutadapt.bam | 
-samtools sort -o results/hela_ds_cpd_cutadapt_sorted.bam  -@ 8 -T results/
-
-samtools view -H results/hela_xr_cpd_cutadapt.bam | grep -v "^@PG" > results/hela_xr_cpd_cutadapt_headers.txt
-samtools reheader results/hela_xr_cpd_cutadapt_headers.txt results/hela_xr_cpd_cutadapt.bam | 
-samtools sort -o results/hela_xr_cpd_cutadapt_sorted.bam  -@ 8 -T results/
-```
+In the next part, we will remove the duplicate reads with picard.
+Let's install it.
 
 ```bash
 conda install -c bioconda picard
+```
+
+To run MarkDplicates command of picard (this command will remove the duplicates for us),
+you need your files to be ordered by their header.
+For that purpose, you should sort the files and then use picard.
+
+```bash
+samtools sort -o results/hela_ds_cpd_cutadapt_sorted.bam results/hela_ds_cpd_cutadapt.bam -@ 8 -T results/
+
+samtools sort -o results/hela_xr_cpd_cutadapt_sorted.bam results/hela_xr_cpd_cutadapt.bam -@ 8 -T results/
 
 (picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/hela_ds_cpd_cutadapt_sorted.bam --TMP_DIR results/ --OUTPUT results/hela_ds_cpd_cutadapt_sorted_dedup.bam --METRICS_FILE results/hela_ds_cpd_cutadapt_sorted_dedub.metrics.txt) > hela_ds_cpd_picard.log 2>&1
 
 (picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/hela_xr_cpd_cutadapt_sorted.bam --TMP_DIR results/ --OUTPUT results/hela_xr_cpd_cutadapt_sorted_dedup.bam --METRICS_FILE results/hela_xr_cpd_cutadapt_sorted_dedub.metrics.txt) > hela_xr_cpd_picard.log 2>&1
 ```
+
+Lastly, we will remove low quality reads (MAPQ score < 20) via samtools and
+use bedtools to convert our bam files into bed format.
 
 ```bash
 conda install -c bioconda bedtools
