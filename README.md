@@ -205,7 +205,7 @@ Another way to assess the data quality is to compare samples and replicates. Rep
 
     bigwigCompare --bigwig1 results/hela_xr_cpd_sorted_chr_plus.bw --bigwig2 results/hela_xr_cpd_sorted_chr_sim_plus.bw --operation ratio --outFileFormat bigwig --outFileName hela_xr_cpd_norm_sim_plus.bw
 
-    computeMatrix scale-regions -S results/hela_xr_cpd_norm_sim_plus.bw -R ref_genome/ --outFileName results/hela_xr_cpd_norm_sim_plus_on_GRCh_genes_1kb_scaleregions_computeMatrix.out -b 1000 -a 1000 --smartLabels
+    computeMatrix scale-regions -S results/hela_xr_cpd_norm_sim_plus.bw -R ref_genome/GRCh38_genes.bed --outFileName results/hela_xr_cpd_norm_sim_plus_on_GRCh_genes_1kb_scaleregions_computeMatrix.out -b 1000 -a 1000 --smartLabels
 
     plotHeatmap --matrixFile results/hela_xr_cpd_norm_sim_plus_on_GRCh_genes_1kb_scaleregions_computeMatrix.out --outFileName hela_xr_cpd_norm_sim_plus_on_GRCh_genes_1kb_heatmap_k2.png --xAxisLabel "Position with respect to genes" --yAxisLabel "Genes" --kmeans 2 --heatmapWidth 10 --startLabel "Start" --endLabel "End"
 
