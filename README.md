@@ -13,36 +13,110 @@
 
 ## Adaptor handling, mapping, quality trimming, and converting to bed
 
-## Sorting, filtering, calculating length dist., filtering damage-seq samples by motif, producing bigwig files
+## Processing BED files and assessing data quality
 ### Sorting BED files
-The BED files are sorted according to genomic coordinates of the reads.
+After obtaining the BED files, the reads in the BED files are sorted according to genomic coordinates.
 
-    sort -k1,1 -k2,2n -k3,3n ${SAMPLE}.bed > ${SAMPLE}_sorted.bed
+    sort -k1,1 -k2,2n -k3,3n hela_xr_cpd.bed > hela_ds_cpd_sorted.bed
+    sort -k1,1 -k2,2n -k3,3n hela_ds_cpd.bed > hela_xr_cpd_sorted.bed
+
+### Filtering for chromosomes
+Reads that are aligned to regions other than chromosomes 1-22 and X are filtered and the rest is kept for further analysis.
+
+    grep "^chr" hela_ds_cpd_sorted.bed \ 
+        grep -v -e "chrY" -e "chrM" > \
+        hela_ds_cpd_sorted_chr.bed
+    
+    grep "^chr" hela_xr_cpd_sorted.bed \ 
+        grep -v -e "chrY" -e "chrM" > \
+        hela_xr_cpd_sorted_chr.bed
+
+### Separating strands
+The reads in the BED files are separated according to which strand they were mapped on.
+```
+    awk '{if($6=="+"){print}}' hela_ds_cpd_sorted_chr.bed > hela_ds_cpd_sorted_chr_plus.bed
+    awk '{if($6=="-"){print}}' hela_ds_cpd_sorted_chr.bed > hela_ds_cpd_sorted_chr_minus.bed
+
+    awk '{if($6=="+"){print}}' hela_xr_cpd_sorted_chr.bed > hela_xr_cpd_sorted_chr_plus.bed
+    awk '{if($6=="-"){print}}' hela_xr_cpd_sorted_chr.bed > hela_xr_cpd_sorted_chr_minus.bed
+```
+
+### Centering the damage site in for Damage-seq reads
+Due to the experimental protocol of Damage-seq, the damaged dipyrimidines are located at the two bases upstream of the reads. We use [bedtools flank](https://www.google.com/search?q=bedtools+flank&rlz=1C1GCEU_enTR1010TR1010&oq=bedtools&aqs=chrome.0.69i59j69i57j69i64j69i59l2j69i60l3.2002j0j7&sourceid=chrome&ie=UTF-8) and [bedtools slop](https://bedtools.readthedocs.io/en/latest/content/tools/slop.html) to obtain 10-nucleotide long read locations with the damaged nucleotides at 5th and 6th positions.
+```
+    bedtools flank -i  hela_ds_cpd_sorted_chr_plus.bed -l 6 -r 0 > \
+    hela_ds_cpd_sorted_chr_plus_flank.bed
+    bedtools flank -i hela_ds_cpd_sorted_chr_minus.bed -l 0 -r 6 > \
+    hela_ds_cpd_sorted_chr_minus_flank.bed
+```
+```
+    bedtools slop -i hela_ds_cpd_sorted_chr_plus_flank.bed \
+        -l 0 -r 4 > \
+        hela_ds_cpd_sorted_chr_plus_10.bed
+    bedtools slop -i hela_ds_cpd_sorted_chr_minus_flank.bed \
+        -l 4 -r 0 > \
+        hela_ds_cpd_sorted_chr_minus_10.bed
+```
+```
+    cat hela_ds_cpd_sorted_chr_plus_10.bed hela_ds_cpd_sorted_chr_minus_10.bed > \
+        hela_ds_cpd_sorted_chr_10.bed
+```
+
+### Obtaining FASTA files from BED files
+To convert BED files to FASTA format:
+    
+    bedtools getfasta \
+        -fi GRCh38.fa \
+        -bed hela_ds_cpd_sorted_chr_plus_10.bed \
+        -fo hela_ds_cpd_sorted_chr_plus_10.fa \
+        -s
+
+    bedtools getfasta \
+        -fi GRCh38.fa \
+        -bed hela_ds_cpd_sorted_chr_minus_10.bed \
+        -fo hela_ds_cpd_sorted_chr_minus_10.fa \
+        -s
+    
+    cat hela_ds_cpd_sorted_chr_plus_10.fa \
+        hela_ds_cpd_sorted_chr_minus_10.fa > \
+        hela_ds_cpd_10.fa
+
+### Filtering Damage-seq data by motif
+Damage-seq reads are expected to contain C and T nucleotides at certain position due to the nature of the NER and Damage-seq experimental protocol. Therefore, we use this as an additional filtering step to eliminate the reads that don’t fit this criteria.
+
+    python3 scripts/fa2bedByChoosingReadMotifs.py hela_ds_cpd_10.fa
 
 ### Obtaining read length distribution and read count
-In order see if our data contains the reads with lengths expexted from the XR-seq or. Damage-seq methods, read length distribution of the data should be extracted.
+In order see if our data contains the reads with lengths expected from the XR-seq or Damage-seq methods, read length distribution of the data should be extracted.
 
+    awk '{{print $3-$2}}' hela_ds_cpd_sorted_chr_10.bed \
+        sort -k1,1n \
+        uniq -c \
+        sed 's/\s\s*/ /g' \
+        awk '{{print $2"\\t"$1}}' > \
+        hela_ds_cpd_sorted_10_ReadLengthDist.txt
 
+    awk '{{print $3-$2}}' hela_xr_cpd_sorted_chr.bed \&
+        sort -k1,1n \& 
+        uniq -c \& 
+        sed 's/\s\s*/ /g' \&
+        awk '{{print $2"\\t"$1}}' > \
+        hela_xr_cpd_sorted_chr_ReadLengthDist.txt
 
 In addition, we count the reads in the BED files and use this count in the following steps. 
 
+    grep -c "^" hela_ds_cpd_sorted_chr_10.bed > hela_ds_cpd_sorted_chr_10_readCount.txt
+    grep -c "^" hela_xr_cpd_sorted_chr.bed > hela_xr_cpd_sorted_chr_readCount.txt
 
+### Generating BigWig files
 
- ### Filtering Damage-seq data by motif
+BigWig file format includes representation of the distribution reads in each genomic window without respect to plus and minus strands. It is a compact file format that is required for many tools in the further analysis steps. 
 
-Damage-seq reads are expected to contain C and T nucleotides at certain position due to the nature of the NER and Damage-seq experimental protocol. Therefore, we use this as an additional filtering step to eliminate the reads that don’t fit this criteria.
-
->
-
-### Generating Bigwig files
-
-Bigwig file format includes representation of the distribution reads in each genomic window without respect to plus and minus strands. It is a compact file format that is required for many tools in the further analysis steps. 
-
-The first step for generation of bigwig files from BED files is generating BedGraph files. Since the strands of the reads are not taken into account in the Bigwig and BedGraph files
+The first step for generation of BigWig files from BED files is generating BedGraph files. Since the strands of the reads are not taken into account in the BigWig and BedGraph files
 
 >
 
-Then, from these Bedgraph files, we can generate Bigwig files. 
+Then, from these Bedgraph files, we can generate BigWig files. 
 
 
 ## Simulating the sample reads
@@ -78,7 +152,7 @@ Pearson corr??
 
 ### Plotting read distribution on genes
 
-deepTools is an easy way to plot read distribution in certain genomic regions. This tool uses the Bigwig files to count the reads in genomic windows and requires the regions of interest in BED format. To plot a line graph of the read  distribution on genes:
+deepTools is an easy way to plot read distribution in certain genomic regions. This tool uses the BigWig files to count the reads in genomic windows and requires the regions of interest in BED format. To plot a line graph of the read  distribution on genes:
 
     deeptools 
 
