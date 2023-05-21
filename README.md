@@ -127,7 +127,7 @@ Because CPD and (6-4)PP damage types require certain nucleotides in certain posi
 
 ```
     conda install boquila -c bioconda 
-    
+
     boquila --fasta results/hela_ds_cpd_sorted_ds_dipyrimidines.fa --bed results/hela_ds_cpd_sorted_ds_dipyrimidines_sim.bed --ref ref_genome/GRCh38.fa --regions ref_genome/GRCh38.ron --kmer 2 --seed 1 --sens 2 > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim.fa
 
     boquila --fasta results/hela_xr_cpd_sorted_chr.fa --bed results/hela_xr_cpd_sorted_chr_sim.bed --ref ref_genome/GRCh38.fa --regions ref_genome/GRCh38.ron --kmer 2 --seed 1 --sens 2 > results/hela_xr_cpd_sorted_chr_sim.fa
@@ -140,6 +140,18 @@ Because CPD and (6-4)PP damage types require certain nucleotides in certain posi
     awk '{if($6=="-"){print}}' results/hela_xr_cpd_sorted_chr_sim.bed > results/hela_xr_cpd_sorted_chr_sim_minus.bed
 
 The read counts from the simulated Damage-seq and XR-seq data are then used to normalize our real Damage-seq and XR-seq data to eliminate the sequence content bias. 
+    
+    grep -c '^' results/hela_ds_cpd_sorted_ds_dipyrimidines_sim.bed > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_readCount.txt
+
+    bedtools genomecov -i results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_readCount.txt | awk '{print 1000000/$1}') > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus.bdg
+    
+    bedtools genomecov -i results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_readCount.txt | awk '{print 1000000/$1}') > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus.bdg
+
+    sort -k1,1 -k2,2n results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus.bdg > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus_sorted.bdg
+    sort -k1,1 -k2,2n results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus.bdg > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus_sorted.bdg
+
+    bedGraphToBigWig results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus_sorted.bdg ref_genome/GRCh38.fa.fai results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus.bw
+    bedGraphToBigWig results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus_sorted.bdg ref_genome/GRCh38.fa.fai results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus_sorted.bw
 
 ## Plotting length distribution, nucleotide enrichment, and bam correlations
 
@@ -161,23 +173,16 @@ Another way to assess the data quality is to compare samples and replicates. Rep
 
     conda install -c bioconda deeptools
 
-    multiBamSummary bins \
-        --bamfiles results/hela_ds_cpd_cutadapt_sorted_dedup.bam \
-        results/hela_xr_cpd_cutadapt_sorted_dedup.bam \
-        --minMappingQuality 20 \
-        --outFileName results/bamSummary.npz
+    multiBamSummary bins --bamfiles results/hela_ds_cpd_cutadapt_sorted_dedup.bam results/hela_xr_cpd_cutadapt_sorted_dedup.bam --minMappingQuality 20 --outFileName results/bamSummary.npz
     
-    plotCorrelation \
-        -in results/bamSummary.npz \
-        --corMethod spearman --skipZeros \
-        --plotTitle "Spearman Correlation of Read Counts" \
-        --whatToPlot heatmap --colorMap RdYlBu --plotNumbers \
-        -o results/bamCorr.png \
+    plotCorrelation -in results/bamSummary.npz --corMethod spearman --skipZeros --plotTitle "Spearman Correlation of Read Counts" --whatToPlot heatmap --colorMap RdYlBu --plotNumbers -o results/bamCorr.png \
 
 ### Plotting read distribution on genes
 
-deepTools is an easy way to plot read distribution in certain genomic regions. This tool uses the BigWig files to count the reads in genomic windows and requires the regions of interest in BED format. To plot a line graph of the read  distribution on genes:
+[deepTools](https://deeptools.readthedocs.io/en/develop/) is an easy way to plot read distribution in certain genomic regions. This tool uses the BigWig files to count the reads in genomic windows and requires the regions of interest in BED format. To plot a line graph of the read  distribution on genes:
 
-    deeptools 
+    bigwigCompare --bigwig1 results/hela_ds_cpd_sorted_ds_dipyrimidines_plus.bw --bigwig2 results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus.bw --operation ratio --outFileFormat bigwig --outFileName hela_ds_cpd_norm_sim_plus.bw
+
+    computeMatrix scale-regions -S results/hela_ds_cpd_norm_sim_plus.bw -R ref_genome/Araport11_GTF_genes_transposons.Sep2022_genes.bed --outFileName hela_ds_cpd_norm_sim_plus_on_Araport11_genes_1kb_scaleregions_computeMatrix.out -b 1000 -a 1000 --smartLabels
 
 ## Running pipeline with snakemake
