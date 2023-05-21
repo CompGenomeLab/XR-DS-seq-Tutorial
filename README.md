@@ -91,7 +91,7 @@ conda install -c bioconda samtools
 ```
 
 Next, you will download the reference genome.
-Because you will analyze HeLa cells that are a type of human cancer cells (derived from cervical cancer cells), GRCh38 genome is chosen as the reference:
+Because you will analyze results/HeLa cells that are a type of human cancer cells (derived from cervical cancer cells), GRCh38 genome is chosen as the reference:
 
 ```bash
 wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/GRCh38.p13.genome.fa.gz -O ref_genome/GRCh38.fa.gz && gunzip ref_genome/GRCh38.fa.gz
@@ -111,7 +111,7 @@ samtools faidx ref_genome/GRCh38.fa
 ```
 
 Next, the index file created by samtools will be converted to a ron file (a different format of the index).
-This file will be useful when we simulate our samples with boquila. 
+This file will be useful when we simulate our samples with boquila.
 
 ```bash
 python3 scripts/idx2ron.py -i ref_genome/GRCh38.fa.fai -o ref_genome/GRCh38.ron -l genome_idex2ron.log
@@ -154,10 +154,10 @@ cutadapt -j 8 -a TGGAATTCTCGGGTGCCAAGGAACTCCAGTNNNNNNACGATCTCGTATGCCGTCTTCTGCTTG
 This section covers the steps involved in mapping the preprocessed reads to the reference genome using Bowtie2, converting the mapped reads to BAM format, and extracting BED files.
 
 ```bash
-bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_GRCh38 -U results/hela_ds_cpd_cutadapt.fq -S results/hela_ds_cpd_cutadapt.sam
+(bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_GRCh38 -U results/hela_ds_cpd_cutadapt.fq -S results/hela_ds_cpd_cutadapt.sam) > hela_ds_cpd_cutadapt_align.log 2>&1
 samtools view -Sbh -o results/hela_ds_cpd_cutadapt.bam results/hela_ds_cpd_cutadapt.sam
 
-bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_GRCh38 -U results/hela_xr_cpd_cutadapt.fq -S results/hela_xr_cpd_cutadapt.sam
+(bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_GRCh38 -U results/hela_xr_cpd_cutadapt.fq -S results/hela_xr_cpd_cutadapt.sam) > hela_xr_cpd_cutadapt_align.log 2>&1
 samtools view -Sbh -o results/hela_xr_cpd_cutadapt.bam results/hela_xr_cpd_cutadapt.sam
 ```
 
@@ -174,21 +174,19 @@ samtools sort -o results/hela_xr_cpd_cutadapt_sorted.bam  -@ 8 -T results/
 ```bash
 conda install -c bioconda picard
 
-picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/hela_ds_cpd_cutadapt_sorted.bam --TMP_DIR results/ --OUTPUT results/hela_ds_cpd_cutadapt_sorted_dedup.bam --METRICS_FILE results/hela_ds_cpd_cutadapt_sorted_dedub.metrics.txt
+(picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/hela_ds_cpd_cutadapt_sorted.bam --TMP_DIR results/ --OUTPUT results/hela_ds_cpd_cutadapt_sorted_dedup.bam --METRICS_FILE results/hela_ds_cpd_cutadapt_sorted_dedub.metrics.txt) > hela_ds_cpd_picard.log 2>&1
 
-picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/hela_xr_cpd_cutadapt_sorted.bam --TMP_DIR results/ --OUTPUT results/hela_xr_cpd_cutadapt_sorted_dedup.bam --METRICS_FILE results/hela_xr_cpd_cutadapt_sorted_dedub.metrics.txt
+(picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/hela_xr_cpd_cutadapt_sorted.bam --TMP_DIR results/ --OUTPUT results/hela_xr_cpd_cutadapt_sorted_dedup.bam --METRICS_FILE results/hela_xr_cpd_cutadapt_sorted_dedub.metrics.txt) > hela_xr_cpd_picard.log 2>&1
 ```
 
 ```bash
 conda install -c bioconda bedtools
 
-samtools sort hela_ds_cpd_cutadapt_sorted_dedup.bam -o hela_ds_cpd_cutadapt_sorted_dedup_resorted.bam -@ 8 -T results/
-samtools index hela_ds_cpd_cutadapt_sorted_dedup_resorted.bam hela_ds_cpd_cutadapt_sorted_dedup_resorted.bam
-samtools view -q 20 -b hela_ds_cpd_cutadapt_sorted_dedup.bam |& bedtools bamtobed > hela_ds_cpd.bed
+samtools index results/hela_ds_cpd_cutadapt_sorted_dedup.bam
+samtools view -q 20 -b results/hela_ds_cpd_cutadapt_sorted_dedup.bam |& bedtools bamtobed > results/hela_ds_cpd.bed
 
-samtools sort hela_xr_cpd_cutadapt_sorted_dedup.bam -o hela_xr_cpd_cutadapt_sorted_dedup_resorted.bam -@ 8 -T results/
-samtools index hela_xr_cpd_cutadapt_sorted_dedup_resorted.bam hela_xr_cpd_cutadapt_sorted_dedup_resorted.bam
-samtools view -q 20 -b hela_xr_cpd_cutadapt_sorted_dedup.bam |& bedtools bamtobed > hela_xr_cpd.bed
+samtools index results/hela_xr_cpd_cutadapt_sorted_dedup.bam
+samtools view -q 20 -b results/hela_xr_cpd_cutadapt_sorted_dedup.bam |& bedtools bamtobed > results/hela_xr_cpd.bed
 ```
 
 ## Sorting, filtering, calculating length dist., filtering damage-seq samples by motif, producing bigwig files
