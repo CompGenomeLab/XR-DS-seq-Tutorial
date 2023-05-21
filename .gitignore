@@ -170,4 +170,6 @@ results/
 !results/README.md
 qc/
 ref_genome/*
+!ref_genome/Bowtie2/
+ref_genome/Bowtie2/*
 !ref_genome/Bowtie2/README.md
