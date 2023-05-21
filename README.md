@@ -17,10 +17,8 @@
 ### Sorting BED files
 After obtaining the BED files, the reads in the BED files are sorted according to genomic coordinates.
 
-    sort -k1,1 -k2,2n -k3,3n results/hela_ds_cpd.bed > \
-        results/hela_ds_cpd_sorted.bed
-    sort -k1,1 -k2,2n -k3,3n results/hela_xr_cpd.bed > \
-        results/hela_xr_cpd_sorted.bed
+    sort -k1,1 -k2,2n -k3,3n results/hela_ds_cpd.bed > results/hela_ds_cpd_sorted.bed
+    sort -k1,1 -k2,2n -k3,3n results/hela_xr_cpd.bed > results/hela_xr_cpd_sorted.bed
 
 ### Filtering for chromosomes
 Reads that are aligned to regions other than chromosomes 1-22 and X are filtered and the rest is kept for further analysis.
@@ -72,9 +70,9 @@ Damage-seq reads are expected to contain C and T nucleotides at certain position
 ### Obtaining read length distribution and read count
 In order see if our data contains the reads with lengths expected from the XR-seq or Damage-seq methods, read length distribution of the data should be extracted.
 
-    awk '{{print $3-$2}}' results/hela_ds_cpd_sorted_ds_dipyrimidines.bed | sort -k1,1n | uniq -c | sed 's/\s\s*/ /g' | awk '{{print $2"\\t"$1}}' > results/hela_ds_cpd_sorted_ds_dipyrimidines_ReadLengthDist.txt
+    awk '{print $3-$2}' results/hela_ds_cpd_sorted_chr.bed | sort -k1,1n | uniq -c | sed 's/\s\s*/ /g' | awk '{print $2"\t"$1}' > results/hela_ds_cpd_sorted_chr_ReadLengthDist.txt
 
-    awk '{{print $3-$2}}' results/hela_xr_cpd_sorted_chr.bed | sort -k1,1n | uniq -c | sed 's/\s\s*/ /g' | awk '{{print $2"\\t"$1}}' > results/hela_xr_cpd_sorted_chr_ReadLengthDist.txt
+    awk '{print $3-$2}' results/hela_xr_cpd_sorted_chr.bed | sort -k1,1n | uniq -c | sed 's/\s\s*/ /g' | awk '{print $2"\t"$1}' > results/hela_xr_cpd_sorted_chr_ReadLengthDist.txt
 
 In addition, we count the reads in the BED files and use this count in the following steps. 
 
@@ -141,17 +139,17 @@ Because CPD and (6-4)PP damage types require certain nucleotides in certain posi
 
 The read counts from the simulated Damage-seq and XR-seq data are then used to normalize our real Damage-seq and XR-seq data to eliminate the sequence content bias. 
     
-    grep -c '^' results/hela_ds_cpd_sorted_ds_dipyrimidines_sim.bed > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_readCount.txt
+    grep -c '^' results/hela_xr_cpd_sorted_chr_sim.bed > results/hela_xr_cpd_sorted_chr_sim_readCount.txt
 
-    bedtools genomecov -i results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_readCount.txt | awk '{print 1000000/$1}') > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus.bdg
+    bedtools genomecov -i results/hela_xr_cpd_sorted_chr_sim_plus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/hela_xr_cpd_sorted_chr_sim_readCount.txt | awk '{print 1000000/$1}') > results/hela_xr_cpd_sorted_chr_sim_plus.bdg
     
-    bedtools genomecov -i results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_readCount.txt | awk '{print 1000000/$1}') > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus.bdg
+    bedtools genomecov -i results/hela_xr_cpd_sorted_chr_sim_minus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/hela_xr_cpd_sorted_chr_sim_readCount.txt | awk '{print 1000000/$1}') > results/hela_xr_cpd_sorted_chr_sim_minus.bdg
 
-    sort -k1,1 -k2,2n results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus.bdg > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus_sorted.bdg
-    sort -k1,1 -k2,2n results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus.bdg > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus_sorted.bdg
+    sort -k1,1 -k2,2n results/hela_xr_cpd_sorted_chr_sim_plus.bdg > results/hela_xr_cpd_sorted_chr_sim_plus_sorted.bdg
+    sort -k1,1 -k2,2n results/hela_xr_cpd_sorted_chr_sim_minus.bdg > results/hela_xr_cpd_sorted_chr_sim_minus_sorted.bdg
 
-    bedGraphToBigWig results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus_sorted.bdg ref_genome/GRCh38.fa.fai results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus.bw
-    bedGraphToBigWig results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus_sorted.bdg ref_genome/GRCh38.fa.fai results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus_sorted.bw
+    bedGraphToBigWig results/hela_xr_cpd_sorted_chr_sim_plus_sorted.bdg ref_genome/GRCh38.fa.fai results/hela_xr_cpd_sorted_chr_sim_plus.bw
+    bedGraphToBigWig results/hela_xr_cpd_sorted_chr_sim_minus_sorted.bdg ref_genome/GRCh38.fa.fai results/hela_xr_cpd_sorted_chr_sim_minus.bw
 
 ## Plotting length distribution, nucleotide enrichment, and bam correlations
 
@@ -159,12 +157,35 @@ The read counts from the simulated Damage-seq and XR-seq data are then used to n
 
 We create a histogram of the read length distribution to clearly understand which read length is mostly found in our data. This information is used as a proof about the success of Damage-seq or XR-seq experiment in capturing the right reads. 
 
->
+    conda install r-rbokeh
+    conda install -c conda-forge r-ggplot2
+    conda install -c conda-forge r-dplyr
 
+    R
+    library(ggplot2)
+    read_len <- read.table("results/hela_xr_cpd_sorted_chr_ReadLengthDist.txt")
+    colnames(read_len) <- c("length", "counts")
+    xrLenDistPlot <- ggplot(data = read_len, aes(x = length, y = counts)) +
+        geom_bar(stat='identity') +
+        xlab("Read length") +
+        ylab("Read count")
+    ggsave("xrLenDistPlot.png")
 
 ### Plotting nucleotide enrichment of the reads
 
 Since the reads from Damage-seq and XR-seq data are expected to contain C and T nucleotides in certain positions, we plot the nucleotide enrichment in each position in reads. This also is used as a proof of data quality. 
+
+    R
+    library(ggplot2)
+    nucl_content <- read.table("results/hela_ds_cpd_sorted_ds_dipyrimidines_nucleotideTable.txt")
+    nucl_content_gathered <- gather(nucl_content, nucl, count, -kmer)
+    nucl_content_gathered$kmer <- factor(nucl_content_gathered$kmer, levels = c("C", "T", "G", "A"))
+    ggplot(data = nucl_content_gathered, aes(x = nucl, y = count, fill = kmer)) +
+    geom_bar(position = "fill", stat='identity') +
+    xlab("Position") +
+    ylab("Count") +
+    labs(fill = "") +
+    scale_fill_manual(values = c("seagreen3","gray60", "steelblue2", "steelblue4"))
 
 
 ### Bam correlations
@@ -181,8 +202,10 @@ Another way to assess the data quality is to compare samples and replicates. Rep
 
 [deepTools](https://deeptools.readthedocs.io/en/develop/) is an easy way to plot read distribution in certain genomic regions. This tool uses the BigWig files to count the reads in genomic windows and requires the regions of interest in BED format. To plot a line graph of the read  distribution on genes:
 
-    bigwigCompare --bigwig1 results/hela_ds_cpd_sorted_ds_dipyrimidines_plus.bw --bigwig2 results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus.bw --operation ratio --outFileFormat bigwig --outFileName hela_ds_cpd_norm_sim_plus.bw
+    bigwigCompare --bigwig1 results/hela_xr_cpd_sorted_chr_plus.bw --bigwig2 results/hela_xr_cpd_sorted_chr_sim_plus.bw --operation ratio --outFileFormat bigwig --outFileName hela_xr_cpd_norm_sim_plus.bw
 
-    computeMatrix scale-regions -S results/hela_ds_cpd_norm_sim_plus.bw -R ref_genome/Araport11_GTF_genes_transposons.Sep2022_genes.bed --outFileName hela_ds_cpd_norm_sim_plus_on_Araport11_genes_1kb_scaleregions_computeMatrix.out -b 1000 -a 1000 --smartLabels
+    computeMatrix scale-regions -S results/hela_xr_cpd_norm_sim_plus.bw -R ref_genome/ --outFileName results/hela_xr_cpd_norm_sim_plus_on_GRCh_genes_1kb_scaleregions_computeMatrix.out -b 1000 -a 1000 --smartLabels
+
+    plotHeatmap --matrixFile results/hela_xr_cpd_norm_sim_plus_on_GRCh_genes_1kb_scaleregions_computeMatrix.out --outFileName hela_xr_cpd_norm_sim_plus_on_GRCh_genes_1kb_heatmap_k2.png --xAxisLabel "Position with respect to genes" --yAxisLabel "Genes" --kmeans 2 --heatmapWidth 10 --startLabel "Start" --endLabel "End"
 
 ## Running pipeline with snakemake
