@@ -22,11 +22,11 @@ The BED files are sorted according to genomic coordinates of the reads.
 ### Obtaining read length distribution and read count
 In order see if our data contains the reads with lengths expexted from the XR-seq or. Damage-seq methods, read length distribution of the data should be extracted.
 
->
+
 
 In addition, we count the reads in the BED files and use this count in the following steps. 
 
->
+
 
  ### Filtering Damage-seq data by motif
 
