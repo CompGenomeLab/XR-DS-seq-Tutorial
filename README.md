@@ -386,10 +386,9 @@ We create a histogram of the read length distribution to clearly understand whic
 ```bash
     conda install r-rbokeh
     conda install -c conda-forge r-ggplot2
-    conda install -c conda-forge r-dplyr
-```
+    conda install -c conda-forge r-tidyr```
 
-```R
+``` R
     library(ggplot2)
     read_len <- read.table("results/hela_xr_cpd_sorted_chr_ReadLengthDist.txt")
     colnames(read_len) <- c("length", "counts")
@@ -404,10 +403,14 @@ We create a histogram of the read length distribution to clearly understand whic
 
 Since the reads from Damage-seq and XR-seq data are expected to contain C and T nucleotides in certain positions, we plot the nucleotide enrichment in each position in reads. This also is used as a proof of data quality. 
 
-```R
+```
+    R
     library(ggplot2)
-    nucl_content <- read.table("results/hela_xr_cpd_sorted_chr_nucleotideTable.txt")
+    library(dplyr)
+    nucl_content <- read.table("results/hela_xr_cpd_sorted_chr_nucleotideTable.txt", header=T)
     nucl_content_gathered <- gather(nucl_content, nucl, count, -kmer)
+    nucl_content_gathered$nucl <- factor(nucl_content_gathered$nucl, levels = c("X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8", "X9", "X10", "X11", "X12", "X13", "X14", "X15", "X16", "X17", "X18", "X19", "X20","X21", "X22", "X23", "X24", "X25", "X26", "X27"), labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20","21", "22", "23", "24", "25", "26", "27"))
+
     nucl_content_gathered$kmer <- factor(nucl_content_gathered$kmer, levels = c("C", "T", "G", "A"))
     xrNuclPlot <- ggplot(data = nucl_content_gathered, aes(x = nucl, y = count, fill = kmer)) +
         geom_bar(position = "fill", stat='identity') +
