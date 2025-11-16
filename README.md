@@ -504,7 +504,7 @@ Another way to assess the data quality is to compare samples and replicates. Rep
 
 If you prefer an automated version of the steps in this tutorial, see the Snakemake workflow:
 
-- Repository: `https://github.com/CompGenomeLab/xr-ds-seq-snakemake`
+- Repository: [CompGenomeLab/xr-ds-seq-snakemake](https://github.com/CompGenomeLab/xr-ds-seq-snakemake)
 
 It orchestrates genome preparation, QC, adapter handling, alignment, BED conversions, Damage-seq motif filtering, coverage track generation, simulations, and downstream summaries. Use it when you need a fully reproducible, end-to-end run with minimal manual intervention.
 
