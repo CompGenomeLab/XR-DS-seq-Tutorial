@@ -3,6 +3,11 @@
 
 This tutorial focuses on the manual analysis of XR-seq and Damage-seq data from raw reads to genome-wide tracks and quality control plots. Use the sections below for step-by-step commands.
 
+Prerequisites:
+- A GitHub account (for obtaining materials and sharing results). Create one at [https://github.com/join](https://github.com/join).
+- Linux environment is recommended. If you are not on Linux, please follow our WSL setup guide: [wsl_vscode_github.pdf](wsl_vscode_github.pdf).
+- [Visual Studio Code](https://code.visualstudio.com/) is highly recommended (not mandatory) for the exercises and file navigation.
+
 Outline:
 - Concepts: XR vs DS signals, strand conventions, lesion/products.
 - QC: FastQC/MultiQC.
@@ -17,7 +22,7 @@ Outline:
 Requirements:
 - Example FASTQs in `samples/`; outputs under `results/`.
 - Reference genome in `ref_genome/` (instructions below use GRCh38 p14).
-- Conda environments for each step (see `ENVIRONMENTS.md`).
+- Conda environments for each step (see [ENVIRONMENTS.md](ENVIRONMENTS.md)).
 
 ### Introduction to XR-seq
 
@@ -112,7 +117,7 @@ This section explains the file formats that you will encounter troughout the tut
 
 ## Create conda environments
 
-See `ENVIRONMENTS.md` for creating and switching between the step-specific environments used in this tutorial. After creating the environments, ensure working directories exist:
+See [ENVIRONMENTS.md](ENVIRONMENTS.md) for creating and switching between the step-specific environments used in this tutorial. After creating the environments, ensure working directories exist:
 
 ```bash
 mkdir -p ref_genome/Bowtie2 results qc
