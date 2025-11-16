@@ -7,6 +7,7 @@ Prerequisites:
 - A GitHub account (for obtaining materials and sharing results). Create one at [https://github.com/join](https://github.com/join).
 - Linux environment is recommended. If you are not on Linux, please follow our WSL setup guide: [wsl_vscode_github.pdf](wsl_vscode_github.pdf).
 - [Visual Studio Code](https://code.visualstudio.com/) is highly recommended (not mandatory) for the exercises and file navigation.
+- Conda environments for each step (see [ENVIRONMENTS.md](ENVIRONMENTS.md)).
 
 Outline:
 - Concepts: XR vs DS signals, strand conventions, lesion/products.
@@ -22,7 +23,6 @@ Outline:
 Requirements:
 - Example FASTQs in `samples/`; outputs under `results/`.
 - Reference genome in `ref_genome/` (instructions below use GRCh38 p14).
-- Conda environments for each step (see [ENVIRONMENTS.md](ENVIRONMENTS.md)).
 
 ### Introduction to XR-seq
 
