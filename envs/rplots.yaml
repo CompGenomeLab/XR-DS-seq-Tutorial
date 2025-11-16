@@ -1,0 +1,12 @@
+name: rplots
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-base
+  - r-ggplot2
+  - r-tidyr
+  - r-dplyr
+
+

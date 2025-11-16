@@ -1,0 +1,10 @@
+name: ucsc
+channels:
+  - mvdbeek
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - ucsc_tools
+
+

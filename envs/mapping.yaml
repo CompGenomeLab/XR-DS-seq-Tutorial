@@ -1,0 +1,11 @@
+name: mapping
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - bowtie2
+  - samtools
+  - picard
+
+

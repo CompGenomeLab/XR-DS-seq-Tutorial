@@ -1,14 +1,56 @@
-# XR-DS-seq-Tutorial
 
-GitHub repository tutorial for XR-Seq and Damage-Seq methodologies, providing code examples, datasets, and documentation for studying DNA damage and repair processes.
+# Analysis Tutorial for XR-seq and Damage-seq
 
-## Introduction to NGS (UNDER CONSTRUCTION)
+This tutorial focuses on the manual analysis of XR-seq and Damage-seq data from raw reads to genome-wide tracks and quality control plots. Use the sections below for step-by-step commands.
 
-This section provides an overview of Next-Generation Sequencing (NGS) technologies, their applications, and their significance in DNA damage and repair studies.
+Outline:
+- Concepts: XR vs DS signals, strand conventions, lesion/products.
+- QC: FastQC/MultiQC.
+- Adapter handling: cutadapt (XR trim-and-keep; DS discard-trim).
+- Alignment and BAM ops: bowtie2, samtools, duplicate handling, MAPQ filtering.
+- BED conversion; chromosome/strand filtering.
+- Damage-seq motif filtering at lesion positions.
+- Coverage and normalization: bedGraph/bigWig per strand; quick IGV review.
+- QC and analyses: length distributions, nucleotide enrichment, replicate correlations, region-level profiles (deepTools).
+- Advanced: simulation-based controls with boquila.
 
-## Introduction to XR-seq (UNDER CONSTRUCTION)
+Requirements:
+- Example FASTQs in `samples/`; outputs under `results/`.
+- Reference genome in `ref_genome/` (instructions below use GRCh38 p14).
+- Conda environments for each step (see `ENVIRONMENTS.md`).
 
-## Introduction to Damage-seq (UNDER CONSTRUCTION)
+### Introduction to XR-seq
+
+Excision Repair sequencing (XR-seq) captures the short oligomers excised by nucleotide excision repair (NER). Key features:
+
+- Captures excision products produced by NER; signals reflect excision activity across the genome.
+- Fragment lengths are protocol- and organism-dependent (e.g., often ~24–32 nt after trimming in many eukaryotes, shorter in some prokaryotes); signal is strand-aware.
+- Interpreting XR-seq focuses on excision footprints and strand assignments rather than any single repair subpathway.
+- Analysis goals: adapter trimming (retain trimmed reads), alignment with short-read-aware parameters, deduplication/quality filtering, convert to BED with correct strandedness, generate normalized coverage (bigWig), and compute QA metrics (length distribution, nucleotide enrichment, correlations).
+
+### Introduction to Damage-seq
+
+Damage-seq maps DNA lesions (e.g., CPD, (6-4)PP) by capturing polymerase-arrested sites. Key features:
+
+- Reads report lesion positions; for UV photoproducts (CPD, (6-4)PP), lesions occur at dipyrimidines; motif filtering improves specificity.
+- Lesion position is typically two bases upstream of the read’s 5′ end; downstream steps center windows accordingly before motif checks.
+- Adapter handling is diagnostic: presence of adapter indicates no polymerase arrest (no lesion), so discard-trim is used to keep only lesion-containing reads.
+- Analysis goals: adapter detection/removal (discard-trim), alignment, high-quality unique mappings, lesion-site coordinate definition, motif filtering, normalized coverage, and QA metrics (length distributions, motif/nucleotide enrichment).
+
+### Further reading
+
+- Hu, J., Li, W., Adebali, O., et al. Genome-wide mapping of nucleotide excision repair with XR-seq. Nature Protocols 14, 248–282 (2019). A detailed, step-by-step XR-seq laboratory and analysis protocol with practical considerations and preliminary analysis examples.  
+  Link: https://www.nature.com/articles/s41596-018-0093-7
+
+- Hu, J., Adar, S., Selby, C. P., Lieb, J. D. & Sancar, A. Genome-wide analysis of human global and transcription-coupled excision repair of UV damage at single-nucleotide resolution. Genes & Development 29, 948–960 (2015). Introduces single-nucleotide–resolution repair maps, separating global and transcription-coupled repair components in human cells.  
+  Link: https://genesdev.cshlp.org/content/29/9/948
+
+- Adar, S., Hu, J., Lieb, J. D. & Sancar, A. Genome-wide kinetics of DNA excision repair in relation to chromatin state and mutagenesis. PNAS (2016). Quantifies excision repair kinetics genome-wide and relates repair dynamics to chromatin features and mutational patterns.  
+  Link: https://www.pnas.org/doi/10.1073/pnas.1614430113
+
+- Li, W., Hu, J., et al. (2017) PNAS. Extends genome-wide mapping by integrating UV damage formation and repair dynamics to reveal determinants of repair heterogeneity.  
+  Link: https://www.pnas.org/doi/10.1073/pnas.1706522114
+
 
 ## NGS File Format
 
@@ -68,33 +110,28 @@ This section explains the file formats that you will encounter troughout the tut
   - They are commonly used for visualizing and analyzing genome-wide data in genome browsers or for performing quantitative analyses across different genomic regions.
   - BigWig files can be generated from BEDGRAPH files using tools like bedGraphToBigWig or through conversion from other formats like BAM or WIG.
 
-## Create conda environment
+## Create conda environments
 
-Initially, you will create and activate a conda environment to set up the necessary dependencies for running the tutorial.
-If you haven't downloaded conda yet, you can find the instructions in the [link](https://conda.io/projects/conda/en/stable/user-guide/install/download.html).
+See `ENVIRONMENTS.md` for creating and switching between the step-specific environments used in this tutorial. After creating the environments, ensure working directories exist:
 
 ```bash
-conda create --name tutorial
-
-conda activate tutorial
+mkdir -p ref_genome/Bowtie2 results qc
 ```
 
 ## Downloading reference genome and generating related files
 
 This section provides commands to download a reference genome (GRCh38) and generate related files.
-In this tutorial, you will use Bowtie2 as the sequence aligner tool. Therefore, you must install Bowtie2 together with samtools, which is a versatile software package used for manipulating and analyzing SAM/BAM files.
+For alignment and BAM operations, activate the mapping environment:
 
 ```bash
-conda install -c bioconda bowtie2
-
-conda install -c bioconda samtools
+conda activate mapping
 ```
 
 Next, you will download the reference genome.
 Because you will analyze results/HeLa cells that are a type of human cancer cells (derived from cervical cancer cells), GRCh38 genome is chosen as the reference:
 
 ```bash
-wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/GRCh38.p13.genome.fa.gz -O ref_genome/GRCh38.fa.gz && gunzip ref_genome/GRCh38.fa.gz
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_48/GRCh38.p14.genome.fa.gz -O ref_genome/GRCh38.fa.gz && gunzip -f ref_genome/GRCh38.fa.gz
 ```
 
 After downloading the genome fasta file, you should generate the index files for bowtie2
@@ -122,10 +159,10 @@ python3 scripts/idx2ron.py -i ref_genome/GRCh38.fa.fai -o ref_genome/GRCh38.ron 
 Here, you'll learn how to perform quality control on the NGS data using FastQC, a tool for assessing the quality of sequencing reads.
 A nice [github page](https://hbctraining.github.io/Intro-to-rnaseq-hpc-salmon/lessons/qc_fastqc_assessment.html) for the evaluation of FastQC results.
 
-To run FastQC, you should download the package from bioconda:
+Activate the `fastqc` environment:
 
 ```bash
-conda install -c bioconda fastqc
+conda activate fastqc
 ```
 
 Then you can create a directory for the output of FastQC with `mkdir qc/` command.
@@ -135,14 +172,16 @@ Lastly, you can run the command below to execute the tool for both Damage-seq an
 fastqc -t 8 --outdir qc/ samples/hela_ds_cpd.fq 
 
 fastqc -t 8 --outdir qc/ samples/hela_xr_cpd.fq 
+
+multiqc qc/ -o qc/
 ```
 
 ## Adaptor handling
 
-This section demonstrates how to handle adaptors in the NGS data using Cutadapt, a tool for trimming adaptor sequences and other contaminants.
+This section demonstrates how to handle adaptors in the NGS data using Cutadapt, a tool for trimming adaptor sequences and other contaminants. Activate the `trimming` environment:
 
 ```bash
-conda install -c bioconda cutadapt
+conda activate trimming
 ```
 
 At this stage, we will perform different tasks for Damage-seq and XR-seq.
@@ -151,9 +190,9 @@ since having the adaptor in Damage-seq reads mean that the read does not contain
 In the case of XR-seq, we will only trim the adaptors from the reads and keep the trimmed ones.
 
 ```bash
-cutadapt -j 8 -g GACTGGTTCCAATTGAAAGTGCTCTTCCGATCT --discard-trimmed -o results/hela_ds_cpd_cutadapt.fq samples/hela_ds_cpd.fq > hela_ds_cpd_cutadapt.log
+cutadapt -j 8 -g GACTGGTTCCAATTGAAAGTGCTCTTCCGATCT --discard-trimmed -o results/ds.trim.fq samples/hela_ds_cpd.fq
 
-cutadapt -j 8 -a TGGAATTCTCGGGTGCCAAGGAACTCCAGTNNNNNNACGATCTCGTATGCCGTCTTCTGCTTG -o results/hela_xr_cpd_cutadapt.fq samples/hela_xr_cpd.fq > hela_xr_cpd_cutadapt.log
+cutadapt -j 8 -a TGGAATTCTCGGGTGCCAAGGAACTCCAGTNNNNNNACGATCTCGTATGCCGTCTTCTGCTTG -o results/xr.trim.fq samples/hela_xr_cpd.fq
 ```
 
 ## Mapping, removing duplicates, quality trimming, and converting to bed
@@ -164,20 +203,19 @@ Initially we will align our reads to the reference genome using the prepared ind
 After that we will convert the output sam files to bam.
 
 ```bash
-(bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_GRCh38 -U results/hela_ds_cpd_cutadapt.fq -S results/hela_ds_cpd_cutadapt.sam) > hela_ds_cpd_cutadapt_align.log 2>&1
+(bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_GRCh38 -U results/ds.trim.fq -S results/ds.sam)
 
-samtools view -Sbh -o results/hela_ds_cpd_cutadapt.bam results/hela_ds_cpd_cutadapt.sam
+samtools view -Sbh -o results/ds.bam results/ds.sam
 
-(bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_GRCh38 -U results/hela_xr_cpd_cutadapt.fq -S results/hela_xr_cpd_cutadapt.sam) > hela_xr_cpd_cutadapt_align.log 2>&1
+(bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_GRCh38 -U results/xr.trim.fq -S results/xr.sam)
 
-samtools view -Sbh -o results/hela_xr_cpd_cutadapt.bam results/hela_xr_cpd_cutadapt.sam
+samtools view -Sbh -o results/xr.bam results/xr.sam
 ```
 
-In the next part, we will remove the duplicate reads with picard.
-Let's install it.
+In the next part, we will remove the duplicate reads with picard. Activate the `mapping` environment (includes bowtie2, samtools, picard):
 
 ```bash
-conda install -c bioconda picard
+conda activate mapping
 ```
 
 To run MarkDplicates command of picard (this command will remove the duplicates for us),
@@ -185,26 +223,31 @@ you need your files to be ordered by their header.
 For that purpose, you should sort the files and then use picard.
 
 ```bash
-samtools sort -o results/hela_ds_cpd_cutadapt_sorted.bam results/hela_ds_cpd_cutadapt.bam -@ 8 -T results/
+samtools sort -o results/ds.sort.bam results/ds.bam -@ 8 -T results/
 
-samtools sort -o results/hela_xr_cpd_cutadapt_sorted.bam results/hela_xr_cpd_cutadapt.bam -@ 8 -T results/
+samtools sort -o results/xr.sort.bam results/xr.bam -@ 8 -T results/
 
-(picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/hela_ds_cpd_cutadapt_sorted.bam --TMP_DIR results/ --OUTPUT results/hela_ds_cpd_cutadapt_sorted_dedup.bam --METRICS_FILE results/hela_ds_cpd_cutadapt_sorted_dedub.metrics.txt) > hela_ds_cpd_picard.log 2>&1
+(picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/ds.sort.bam --TMP_DIR results/ --OUTPUT results/ds.dedup.bam --METRICS_FILE results/ds.dedup.metrics.txt)
 
-(picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/hela_xr_cpd_cutadapt_sorted.bam --TMP_DIR results/ --OUTPUT results/hela_xr_cpd_cutadapt_sorted_dedup.bam --METRICS_FILE results/hela_xr_cpd_cutadapt_sorted_dedub.metrics.txt) > hela_xr_cpd_picard.log 2>&1
+(picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/xr.sort.bam --TMP_DIR results/ --OUTPUT results/xr.dedup.bam --METRICS_FILE results/xr.dedup.metrics.txt)
 ```
 
 Lastly, we will remove low quality reads (MAPQ score < 20) via samtools and
 use bedtools to convert our bam files into bed format.
 
 ```bash
-conda install -c bioconda bedtools
+# Mapping env for samtools filtering
+conda activate mapping
+samtools index results/ds.dedup.bam
+samtools view -q 20 -b results/ds.dedup.bam > results/ds.q20.bam
 
-samtools index results/hela_ds_cpd_cutadapt_sorted_dedup.bam
-samtools view -q 20 -b results/hela_ds_cpd_cutadapt_sorted_dedup.bam |& bedtools bamtobed > results/hela_ds_cpd.bed
+samtools index results/xr.dedup.bam
+samtools view -q 20 -b results/xr.dedup.bam > results/xr.q20.bam
 
-samtools index results/hela_xr_cpd_cutadapt_sorted_dedup.bam
-samtools view -q 20 -b results/hela_xr_cpd_cutadapt_sorted_dedup.bam |& bedtools bamtobed > results/hela_xr_cpd.bed
+# Bedops env for BED conversion
+conda activate bedops
+bedtools bamtobed -i results/ds.q20.bam > results/ds.bed
+bedtools bamtobed -i results/xr.q20.bam > results/xr.bed
 ```
 
 ## Sorting BED files
@@ -212,9 +255,9 @@ samtools view -q 20 -b results/hela_xr_cpd_cutadapt_sorted_dedup.bam |& bedtools
 After obtaining the BED files, the reads in the BED files are sorted according to genomic coordinates.
 
 ```bash
-sort -k1,1 -k2,2n -k3,3n results/hela_ds_cpd.bed > results/hela_ds_cpd_sorted.bed
+sort -k1,1 -k2,2n -k3,3n results/ds.bed > results/ds.sorted.bed
 
-sort -k1,1 -k2,2n -k3,3n results/hela_xr_cpd.bed > results/hela_xr_cpd_sorted.bed
+sort -k1,1 -k2,2n -k3,3n results/xr.bed > results/xr.sorted.bed
 ```
 
 ## Filtering for chromosomes
@@ -222,9 +265,9 @@ sort -k1,1 -k2,2n -k3,3n results/hela_xr_cpd.bed > results/hela_xr_cpd_sorted.be
 Reads that are aligned to regions other than chromosomes 1-22 and X are filtered and the rest is kept for further analysis.
 
 ```bash
-grep "^chr" results/hela_ds_cpd_sorted.bed | grep -v -e "chrY" -e "chrM" > results/hela_ds_cpd_sorted_chr.bed
+grep "^chr" results/ds.sorted.bed | grep -v -e "chrY" -e "chrM" > results/ds.sorted.chr.bed
 
-grep "^chr" results/hela_xr_cpd_sorted.bed | grep -v -e "chrY" -e "chrM" > results/hela_xr_cpd_sorted_chr.bed
+grep "^chr" results/xr.sorted.bed | grep -v -e "chrY" -e "chrM" > results/xr.sorted.chr.bed
 ```
 
 ## Separating strands
@@ -232,31 +275,31 @@ grep "^chr" results/hela_xr_cpd_sorted.bed | grep -v -e "chrY" -e "chrM" > resul
 The reads in the BED files are separated according to which strand they were mapped on.
 
 ```bash
-    awk '{if($6=="+"){print}}' results/hela_ds_cpd_sorted_chr.bed > results/hela_ds_cpd_sorted_chr_plus.bed
-    awk '{if($6=="-"){print}}' results/hela_ds_cpd_sorted_chr.bed > results/hela_ds_cpd_sorted_chr_minus.bed
+    awk '{if($6=="+"){print}}' results/ds.sorted.chr.bed > results/ds.sorted.chr.plus.bed
+    awk '{if($6=="-"){print}}' results/ds.sorted.chr.bed > results/ds.sorted.chr.minus.bed
 
-    awk '{if($6=="+"){print}}' results/hela_xr_cpd_sorted_chr.bed > results/hela_xr_cpd_sorted_chr_plus.bed
-    awk '{if($6=="-"){print}}' results/hela_xr_cpd_sorted_chr.bed > results/hela_xr_cpd_sorted_chr_minus.bed
+    awk '{if($6=="+"){print}}' results/xr.sorted.chr.bed > results/xr.sorted.chr.plus.bed
+    awk '{if($6=="-"){print}}' results/xr.sorted.chr.bed > results/xr.sorted.chr.minus.bed
 ```
 
 ## Centering the damage site in for Damage-seq reads
 
-Due to the experimental protocol of Damage-seq, the damaged dipyrimidines are located at the two bases upstream of the reads. We use [bedtools flank](https://www.google.com/search?q=bedtools+flank&rlz=1C1GCEU_enTR1010TR1010&oq=bedtools&aqs=chrome.0.69i59j69i57j69i64j69i59l2j69i60l3.2002j0j7&sourceid=chrome&ie=UTF-8) and [bedtools slop](https://bedtools.readthedocs.io/en/latest/content/tools/slop.html) to obtain 10-nucleotide long read locations with the damaged nucleotides at 5th and 6th positions.
+Due to the experimental protocol of Damage-seq, the damaged dipyrimidines are located at the two bases upstream of the reads. We use [bedtools flank](https://bedtools.readthedocs.io/en/latest/content/tools/flank.html) and [bedtools slop](https://bedtools.readthedocs.io/en/latest/content/tools/slop.html) to obtain 10-nucleotide long read locations with the damaged nucleotides at 5th and 6th positions.
 
 ```bash
     cut -f1,2 ref_genome/GRCh38.fa.fai > ref_genome/sizes.chrom
 
-    bedtools flank -i  results/hela_ds_cpd_sorted_chr_plus.bed -g ref_genome/sizes.chrom -l 6 -r 0 > results/hela_ds_cpd_sorted_chr_plus_flank.bed
-    bedtools flank -i results/hela_ds_cpd_sorted_chr_minus.bed -g ref_genome/sizes.chrom -l 0 -r 6 > results/hela_ds_cpd_sorted_chr_minus_flank.bed
+    bedtools flank -i  results/ds.sorted.chr.plus.bed -g ref_genome/sizes.chrom -l 6 -r 0 > results/ds.plus.flank.bed
+    bedtools flank -i results/ds.sorted.chr.minus.bed -g ref_genome/sizes.chrom -l 0 -r 6 > results/ds.minus.flank.bed
 ```
 
 ```bash
-    bedtools slop -i results/hela_ds_cpd_sorted_chr_plus_flank.bed -g ref_genome/sizes.chrom -l 0 -r 4 > results/hela_ds_cpd_sorted_chr_plus_10.bed
-    bedtools slop -i results/hela_ds_cpd_sorted_chr_minus_flank.bed -g ref_genome/sizes.chrom -l 4 -r 0 > results/hela_ds_cpd_sorted_chr_minus_10.bed
+    bedtools slop -i results/ds.plus.flank.bed -g ref_genome/sizes.chrom -l 0 -r 4 > results/ds.plus.10.bed
+    bedtools slop -i results/ds.minus.flank.bed -g ref_genome/sizes.chrom -l 4 -r 0 > results/ds.minus.10.bed
 ```
 
 ```bash
-    cat results/hela_ds_cpd_sorted_chr_plus_10.bed results/hela_ds_cpd_sorted_chr_minus_10.bed > results/hela_ds_cpd_sorted_chr_10.bed
+    cat results/ds.plus.10.bed results/ds.minus.10.bed > results/ds.10.bed
 ```
 
 ### Obtaining FASTA files from BED files
@@ -264,8 +307,8 @@ Due to the experimental protocol of Damage-seq, the damaged dipyrimidines are lo
 To convert BED files to FASTA format:
 
 ```bash
-    bedtools getfasta -fi ref_genome/GRCh38.fa -bed results/hela_ds_cpd_sorted_chr_plus_10.bed -fo results/hela_ds_cpd_sorted_plus_10.fa -s
-    bedtools getfasta -fi ref_genome/GRCh38.fa -bed results/hela_ds_cpd_sorted_chr_minus_10.bed -fo results/hela_ds_cpd_sorted_minus_10.fa -s
+    bedtools getfasta -fi ref_genome/GRCh38.fa -bed results/ds.plus.10.bed -fo results/ds.plus.10.fa -s
+    bedtools getfasta -fi ref_genome/GRCh38.fa -bed results/ds.minus.10.bed -fo results/ds.minus.10.fa -s
 ```
 
 ### Filtering Damage-seq data by motif
@@ -273,39 +316,39 @@ To convert BED files to FASTA format:
 Damage-seq reads are expected to contain C and T nucleotides at certain position due to the nature of the NER and Damage-seq experimental protocol. Therefore, we use this as an additional filtering step to eliminate the reads that don’t fit this criteria.
 
 ```bash
-    python3 scripts/fa2bedByChoosingReadMotifs.py -i results/hela_ds_cpd_sorted_plus_10.fa -o results/hela_ds_cpd_sorted_ds_dipyrimidines_plus.bed -r '.{4}(c|t|C|T){2}.{4}'
-    python3 scripts/fa2bedByChoosingReadMotifs.py -i results/hela_ds_cpd_sorted_minus_10.fa -o results/hela_ds_cpd_sorted_ds_dipyrimidines_minus.bed -r '.{4}(c|t|C|T){2}.{4}'
+    python3 scripts/fa2bedByChoosingReadMotifs.py -i results/ds.plus.10.fa -o results/ds.dipy.plus.bed -r '.{4}(c|t|C|T){2}.{4}'
+    python3 scripts/fa2bedByChoosingReadMotifs.py -i results/ds.minus.10.fa -o results/ds.dipy.minus.bed -r '.{4}(c|t|C|T){2}.{4}'
 
-    cat results/hela_ds_cpd_sorted_ds_dipyrimidines_plus.bed results/hela_ds_cpd_sorted_ds_dipyrimidines_minus.bed > results/hela_ds_cpd_sorted_ds_dipyrimidines.bed
+    cat results/ds.dipy.plus.bed results/ds.dipy.minus.bed > results/ds.dipy.bed
 ```
 
 ### Obtaining read length distribution and read count
 In order see if our data contains the reads with lengths expected from the XR-seq or Damage-seq methods, read length distribution of the data should be extracted.
 
 ```bash
-    awk '{print $3-$2}' results/hela_ds_cpd_sorted_chr.bed | sort -k1,1n | uniq -c | sed 's/\s\s*/ /g' | awk '{print $2"\t"$1}' > results/hela_ds_cpd_sorted_chr_ReadLengthDist.txt
+    awk '{print $3-$2}' results/ds.sorted.chr.bed | sort -k1,1n | uniq -c | sed 's/\s\s*/ /g' | awk '{print $2"\t"$1}' > results/ds.len.txt
 
-    awk '{print $3-$2}' results/hela_xr_cpd_sorted_chr.bed | sort -k1,1n | uniq -c | sed 's/\s\s*/ /g' | awk '{print $2"\t"$1}' > results/hela_xr_cpd_sorted_chr_ReadLengthDist.txt
+    awk '{print $3-$2}' results/xr.sorted.chr.bed | sort -k1,1n | uniq -c | sed 's/\s\s*/ /g' | awk '{print $2"\t"$1}' > results/xr.len.txt
 ```
 
 In addition, we count the reads in the BED files and use this count in the following steps. 
 
 ```bash
-    grep -c "^" results/hela_ds_cpd_sorted_ds_dipyrimidines.bed > results/hela_ds_cpd_sorted_ds_dipyrimidines_readCount.txt
-    grep -c "^" results/hela_xr_cpd_sorted_chr.bed > results/hela_xr_cpd_sorted_chr_readCount.txt
+    grep -c "^" results/ds.dipy.bed > results/ds.dipy.count.txt
+    grep -c "^" results/xr.sorted.chr.bed > results/xr.count.txt
 ```
 
 ### Assessing nucleotide content
 We check the reads for the enrichment of nucleotides and dinucleotides at specific positions.
 
 ```bash
-    bedtools getfasta -fi ref_genome/GRCh38.fa -bed results/hela_ds_cpd_sorted_ds_dipyrimidines.bed -fo results/hela_ds_cpd_sorted_ds_dipyrimidines.fa -s
+    bedtools getfasta -fi ref_genome/GRCh38.fa -bed results/ds.dipy.bed -fo results/ds.dipy.fa -s
 
-    bedtools getfasta -fi ref_genome/GRCh38.fa -bed results/hela_xr_cpd_sorted_chr.bed -fo results/hela_xr_cpd_sorted_chr.fa -s
+    bedtools getfasta -fi ref_genome/GRCh38.fa -bed results/xr.sorted.chr.bed -fo results/xr.fa -s
 
-    python3 scripts/fa2kmerAbundanceTable.py -i results/hela_ds_cpd_sorted_ds_dipyrimidines.fa -k 1 -o results/hela_ds_cpd_sorted_ds_dipyrimidines_nucleotideTable.txt
+    python3 scripts/fa2kmerAbundanceTable.py -i results/ds.dipy.fa -k 1 -o results/ds.dipy.nt.txt
 
-    python3 scripts/fa2kmerAbundanceTable.py -i results/hela_xr_cpd_sorted_chr.fa -k 1 -o results/hela_xr_cpd_sorted_chr_nucleotideTable.txt
+    python3 scripts/fa2kmerAbundanceTable.py -i results/xr.fa -k 1 -o results/xr.nt.txt
 ```
 
 ### Generating BigWig files
@@ -315,66 +358,71 @@ BigWig file format includes representation of the distribution reads in each gen
 The first step for generation of BigWig files from BED files is generating BedGraph files. Since the strands of the reads are not taken into account in the BigWig and BedGraph files
 
 ```bash
-    conda install -c mvdbeek ucsc_tools
-
-    bedtools genomecov -i results/hela_ds_cpd_sorted_ds_dipyrimidines_plus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/hela_ds_cpd_sorted_ds_dipyrimidines_readCount.txt | awk '{print 1000000/$1}') > results/hela_ds_cpd_sorted_ds_dipyrimidines_plus.bdg
+    # BedGraph generation with bedtools (bedops env)
+    conda activate bedops
+    bedtools genomecov -i results/ds.dipy.plus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/ds.dipy.count.txt | awk '{print 1000000/$1}') > results/ds.dipy.plus.bdg
     
-    bedtools genomecov -i results/hela_ds_cpd_sorted_ds_dipyrimidines_minus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/hela_ds_cpd_sorted_ds_dipyrimidines_readCount.txt | awk '{print 1000000/$1}') > results/hela_ds_cpd_sorted_ds_dipyrimidines_minus.bdg
+    bedtools genomecov -i results/ds.dipy.minus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/ds.dipy.count.txt | awk '{print 1000000/$1}') > results/ds.dipy.minus.bdg
 
-    bedtools genomecov -i results/hela_xr_cpd_sorted_chr_plus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/hela_xr_cpd_sorted_chr_readCount.txt | awk '{print 1000000/$1}') > results/hela_xr_cpd_sorted_chr_plus.bdg        
+    bedtools genomecov -i results/xr.sorted.chr.plus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/xr.count.txt | awk '{print 1000000/$1}') > results/xr.plus.bdg        
     
-    bedtools genomecov -i results/hela_xr_cpd_sorted_chr_minus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/hela_xr_cpd_sorted_chr_readCount.txt | awk '{print 1000000/$1}') > results/hela_xr_cpd_sorted_chr_minus.bdg
+    bedtools genomecov -i results/xr.sorted.chr.minus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/xr.count.txt | awk '{print 1000000/$1}') > results/xr.minus.bdg
 ```
 
 Then, from these BedGraph files, we generate BigWig files. 
 
 ```bash
-    sort -k1,1 -k2,2n results/hela_ds_cpd_sorted_ds_dipyrimidines_plus.bdg > results/hela_ds_cpd_sorted_ds_dipyrimidines_plus_sorted.bdg
-    sort -k1,1 -k2,2n results/hela_ds_cpd_sorted_ds_dipyrimidines_minus.bdg > results/hela_ds_cpd_sorted_ds_dipyrimidines_minus_sorted.bdg
+    # Sort BedGraphs (still in bedops env)
+    sort -k1,1 -k2,2n results/ds.dipy.plus.bdg > results/ds.dipy.plus.sorted.bdg
+    sort -k1,1 -k2,2n results/ds.dipy.minus.bdg > results/ds.dipy.minus.sorted.bdg
     
-    sort -k1,1 -k2,2n results/hela_xr_cpd_sorted_chr_plus.bdg > results/hela_xr_cpd_sorted_chr_plus_sorted.bdg
-    sort -k1,1 -k2,2n results/hela_xr_cpd_sorted_chr_minus.bdg > results/hela_xr_cpd_sorted_chr_minus_sorted.bdg
-        
-    bedGraphToBigWig results/hela_ds_cpd_sorted_ds_dipyrimidines_plus_sorted.bdg ref_genome/GRCh38.fa.fai results/hela_ds_cpd_sorted_ds_dipyrimidines_plus.bw
-    bedGraphToBigWig results/hela_ds_cpd_sorted_ds_dipyrimidines_minus_sorted.bdg ref_genome/GRCh38.fa.fai results/hela_ds_cpd_sorted_ds_dipyrimidines_minus.bw
+    sort -k1,1 -k2,2n results/xr.plus.bdg > results/xr.plus.sorted.bdg
+    sort -k1,1 -k2,2n results/xr.minus.bdg > results/xr.minus.sorted.bdg
+```
 
-    bedGraphToBigWig results/hela_xr_cpd_sorted_chr_plus_sorted.bdg ref_genome/GRCh38.fa.fai results/hela_xr_cpd_sorted_chr_plus.bw
-    bedGraphToBigWig results/hela_xr_cpd_sorted_chr_minus_sorted.bdg ref_genome/GRCh38.fa.fai results/hela_xr_cpd_sorted_chr_minus.bw
+```bash
+    # Convert to BigWig (ucsc env)
+    conda activate ucsc
+    bedGraphToBigWig results/ds.dipy.plus.sorted.bdg ref_genome/GRCh38.fa.fai results/ds.dipy.plus.bw
+    bedGraphToBigWig results/ds.dipy.minus.sorted.bdg ref_genome/GRCh38.fa.fai results/ds.dipy.minus.bw
+
+    bedGraphToBigWig results/xr.plus.sorted.bdg ref_genome/GRCh38.fa.fai results/xr.plus.bw
+    bedGraphToBigWig results/xr.minus.sorted.bdg ref_genome/GRCh38.fa.fai results/xr.minus.bw
 ```
 
 ## Simulating the sample reads
 Because CPD and (6-4)PP damage types require certain nucleotides in certain positions, the genomic locations rich in adjacent CC, TC, CT or TT dinucleotides may be prone to receiving more UV damage while other regions that are poor in these dinucleotides receive less damage. Therefore, the sequence contents may bias our analysis results while comparing the damage formation or NER efficiency of two genomic regions. In order to eliminate the effect of  sequence content, we create synthetic sequencing data from the real Damage-seq and XR-seq data, which give us the expected damage counts and NER efficiencies, respectively, from the sequence content of the genomic areas of interest. We use [Boquila](https://github.com/CompGenomeLab/boquila) to generate simulated data.
 
 ```bash
-    conda install boquila -c bioconda 
+    conda activate boquila
 
-    boquila --fasta results/hela_ds_cpd_sorted_ds_dipyrimidines.fa --bed results/hela_ds_cpd_sorted_ds_dipyrimidines_sim.bed --ref ref_genome/GRCh38.fa --regions ref_genome/GRCh38.ron --kmer 2 --seed 1 --sens 2 > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim.fa
+    boquila --fasta results/ds.dipy.fa --bed results/ds.sim.bed --ref ref_genome/GRCh38.fa --regions ref_genome/GRCh38.ron --kmer 2 --seed 1 --sens 2 > results/ds.sim.fa
 
-    boquila --fasta results/hela_xr_cpd_sorted_chr.fa --bed results/hela_xr_cpd_sorted_chr_sim.bed --ref ref_genome/GRCh38.fa --regions ref_genome/GRCh38.ron --kmer 2 --seed 1 --sens 2 > results/hela_xr_cpd_sorted_chr_sim.fa
+    boquila --fasta results/xr.fa --bed results/xr.sim.bed --ref ref_genome/GRCh38.fa --regions ref_genome/GRCh38.ron --kmer 2 --seed 1 --sens 2 > results/xr.sim.fa
 ```
 
 ```bash
-    awk '{if($6=="+"){print}}' results/hela_ds_cpd_sorted_ds_dipyrimidines_sim.bed > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_plus.bed
-    awk '{if($6=="-"){print}}' results/hela_ds_cpd_sorted_ds_dipyrimidines_sim.bed > results/hela_ds_cpd_sorted_ds_dipyrimidines_sim_minus.bed
+    awk '{if($6=="+"){print}}' results/ds.sim.bed > results/ds.sim.plus.bed
+    awk '{if($6=="-"){print}}' results/ds.sim.bed > results/ds.sim.minus.bed
 
-    awk '{if($6=="+"){print}}' results/hela_xr_cpd_sorted_chr_sim.bed > results/hela_xr_cpd_sorted_chr_sim_plus.bed
-    awk '{if($6=="-"){print}}' results/hela_xr_cpd_sorted_chr_sim.bed > results/hela_xr_cpd_sorted_chr_sim_minus.bed
+    awk '{if($6=="+"){print}}' results/xr.sim.bed > results/xr.sim.plus.bed
+    awk '{if($6=="-"){print}}' results/xr.sim.bed > results/xr.sim.minus.bed
 ```
 
 The read counts from the simulated Damage-seq and XR-seq data are then used to normalize our real Damage-seq and XR-seq data to eliminate the sequence content bias.
 
 ```bash
-    grep -c '^' results/hela_xr_cpd_sorted_chr_sim.bed > results/hela_xr_cpd_sorted_chr_sim_readCount.txt
+    grep -c '^' results/xr.sim.bed > results/xr.sim.count.txt
 
-    bedtools genomecov -i results/hela_xr_cpd_sorted_chr_sim_plus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/hela_xr_cpd_sorted_chr_sim_readCount.txt | awk '{print 1000000/$1}') > results/hela_xr_cpd_sorted_chr_sim_plus.bdg
+    bedtools genomecov -i results/xr.sim.plus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.plus.bdg
     
-    bedtools genomecov -i results/hela_xr_cpd_sorted_chr_sim_minus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/hela_xr_cpd_sorted_chr_sim_readCount.txt | awk '{print 1000000/$1}') > results/hela_xr_cpd_sorted_chr_sim_minus.bdg
+    bedtools genomecov -i results/xr.sim.minus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.minus.bdg
 
-    sort -k1,1 -k2,2n results/hela_xr_cpd_sorted_chr_sim_plus.bdg > results/hela_xr_cpd_sorted_chr_sim_plus_sorted.bdg
-    sort -k1,1 -k2,2n results/hela_xr_cpd_sorted_chr_sim_minus.bdg > results/hela_xr_cpd_sorted_chr_sim_minus_sorted.bdg
+    sort -k1,1 -k2,2n results/xr.sim.plus.bdg > results/xr.sim.plus.sorted.bdg
+    sort -k1,1 -k2,2n results/xr.sim.minus.bdg > results/xr.sim.minus.sorted.bdg
 
-    bedGraphToBigWig results/hela_xr_cpd_sorted_chr_sim_plus_sorted.bdg ref_genome/GRCh38.fa.fai results/hela_xr_cpd_sorted_chr_sim_plus.bw
-    bedGraphToBigWig results/hela_xr_cpd_sorted_chr_sim_minus_sorted.bdg ref_genome/GRCh38.fa.fai results/hela_xr_cpd_sorted_chr_sim_minus.bw
+    bedGraphToBigWig results/xr.sim.plus.sorted.bdg ref_genome/GRCh38.fa.fai results/xr.sim.plus.bw
+    bedGraphToBigWig results/xr.sim.minus.sorted.bdg ref_genome/GRCh38.fa.fai results/xr.sim.minus.bw
 ```
 
 ## Plotting length distribution, nucleotide enrichment, and bam correlations
@@ -384,13 +432,12 @@ The read counts from the simulated Damage-seq and XR-seq data are then used to n
 We create a histogram of the read length distribution to clearly understand which read length is mostly found in our data. This information is used as a proof about the success of Damage-seq or XR-seq experiment in capturing the right reads. 
 
 ```bash
-    conda install r-rbokeh
-    conda install -c conda-forge r-ggplot2
-    conda install -c conda-forge r-tidyr```
+    conda activate rplots
+```
 
 ``` R
     library(ggplot2)
-    read_len <- read.table("results/hela_xr_cpd_sorted_chr_ReadLengthDist.txt")
+    read_len <- read.table("results/xr.len.txt")
     colnames(read_len) <- c("length", "counts")
     xrLenDistPlot <- ggplot(data = read_len, aes(x = length, y = counts)) +
         geom_bar(stat='identity') +
@@ -403,22 +450,25 @@ We create a histogram of the read length distribution to clearly understand whic
 
 Since the reads from Damage-seq and XR-seq data are expected to contain C and T nucleotides in certain positions, we plot the nucleotide enrichment in each position in reads. This also is used as a proof of data quality. 
 
-```
-    R
-    library(ggplot2)
-    library(dplyr)
-    nucl_content <- read.table("results/hela_xr_cpd_sorted_chr_nucleotideTable.txt", header=T)
-    nucl_content_gathered <- gather(nucl_content, nucl, count, -kmer)
-    nucl_content_gathered$nucl <- factor(nucl_content_gathered$nucl, levels = c("X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8", "X9", "X10", "X11", "X12", "X13", "X14", "X15", "X16", "X17", "X18", "X19", "X20","X21", "X22", "X23", "X24", "X25", "X26", "X27"), labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20","21", "22", "23", "24", "25", "26", "27"))
+```R
+library(ggplot2)
+library(dplyr)
+library(tidyr)
 
-    nucl_content_gathered$kmer <- factor(nucl_content_gathered$kmer, levels = c("C", "T", "G", "A"))
-    xrNuclPlot <- ggplot(data = nucl_content_gathered, aes(x = nucl, y = count, fill = kmer)) +
-        geom_bar(position = "fill", stat='identity') +
-        xlab("Position") +
-        ylab("Count") +
-        labs(fill = "") +
-        scale_fill_manual(values = c("seagreen3","gray60", "steelblue2", "steelblue4"))
-    ggsave("results/xrNuclPlot.png")
+nucl_content <- read.table("results/xr.nt.txt", header=TRUE)
+nucl_content_gathered <- gather(nucl_content, nucl, count, -kmer)
+nucl_content_gathered$nucl <- factor(nucl_content_gathered$nucl,
+    levels = c("X1","X2","X3","X4","X5","X6","X7","X8","X9","X10","X11","X12","X13","X14","X15","X16","X17","X18","X19","X20","X21","X22","X23","X24","X25","X26","X27"),
+    labels = c("1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27"))
+nucl_content_gathered$kmer <- factor(nucl_content_gathered$kmer, levels = c("C","T","G","A"))
+
+xrNuclPlot <- ggplot(data = nucl_content_gathered, aes(x = nucl, y = count, fill = kmer)) +
+    geom_bar(position = "fill", stat='identity') +
+    xlab("Position") +
+    ylab("Count") +
+    labs(fill = "") +
+    scale_fill_manual(values = c("seagreen3","gray60","steelblue2","steelblue4"))
+ggsave("results/xrNuclPlot.png", xrNuclPlot, width = 8, height = 4, dpi = 150)
 ```
 
 ### Bam correlations
@@ -426,11 +476,11 @@ Since the reads from Damage-seq and XR-seq data are expected to contain C and T 
 Another way to assess the data quality is to compare samples and replicates. Replicates should be alike in terms of genomic distribution of their reads while, for example, CPD samples should be different than (6-4)PP samples.
 
 ```bash
-    conda install -c bioconda deeptools
+    conda activate deeptools
 
-    multiBamSummary bins --bamfiles results/hela_ds_cpd_cutadapt_sorted_dedup.bam results/hela_xr_cpd_cutadapt_sorted_dedup.bam --minMappingQuality 20 --outFileName results/bamSummary.npz
+    multiBamSummary bins --bamfiles results/ds.dedup.bam results/xr.dedup.bam --minMappingQuality 20 --outFileName results/bamSummary.npz
     
-    plotCorrelation -in results/bamSummary.npz --corMethod spearman --skipZeros --plotTitle "Spearman Correlation of Read Counts" --whatToPlot heatmap --colorMap RdYlBu --plotNumbers -o results/bamCorr.png \
+    plotCorrelation -in results/bamSummary.npz --corMethod spearman --skipZeros --plotTitle "Spearman Correlation of Read Counts" --whatToPlot heatmap --colorMap RdYlBu --plotNumbers -o results/bamCorr.png
 ```
 
 ### Plotting read distribution on genes
@@ -438,13 +488,18 @@ Another way to assess the data quality is to compare samples and replicates. Rep
 [deepTools](https://deeptools.readthedocs.io/en/develop/) is an easy way to plot read distribution in certain genomic regions. This tool uses the BigWig files to count the reads in genomic windows and requires the regions of interest in BED format. To plot a line graph of the read  distribution on genes:
 
 ```bash
-    bigwigCompare --bigwig1 results/hela_xr_cpd_sorted_chr_plus.bw --bigwig2 results/hela_xr_cpd_sorted_chr_sim_plus.bw --operation ratio --outFileFormat bigwig --outFileName hela_xr_cpd_norm_sim_plus.bw
+    bigwigCompare --bigwig1 results/xr.plus.bw --bigwig2 results/xr.sim.plus.bw --operation ratio --outFileFormat bigwig --outFileName results/xr.norm_sim.plus.bw
 
-    computeMatrix scale-regions -S results/hela_xr_cpd_norm_sim_plus.bw -R ref_genome/GRCh38_genes.bed --outFileName results/hela_xr_cpd_norm_sim_plus_on_GRCh_genes_1kb_scaleregions_computeMatrix.out -b 1000 -a 1000 --smartLabels
+    computeMatrix scale-regions -S results/xr.norm_sim.plus.bw -R ref_genome/GRCh38_genes.bed --outFileName results/xr.norm_sim.plus.on_genes.computeMatrix.out -b 1000 -a 1000 --smartLabels
 
-    plotHeatmap --matrixFile results/hela_xr_cpd_norm_sim_plus_on_GRCh_genes_1kb_scaleregions_computeMatrix.out --outFileName hela_xr_cpd_norm_sim_plus_on_GRCh_genes_1kb_heatmap_k2.png --xAxisLabel "Position with respect to genes" --yAxisLabel "Genes" --kmeans 2 --heatmapWidth 10 --startLabel "Start" --endLabel "End"
+    plotHeatmap --matrixFile results/xr.norm_sim.plus.on_genes.computeMatrix.out --outFileName results/xr.norm_sim.plus.on_genes.heatmap_k2.png --xAxisLabel "Position with respect to genes" --yAxisLabel "Genes" --kmeans 2 --heatmapWidth 10 --startLabel "Start" --endLabel "End"
 ```
 
-## Running pipeline with snakemake
+## Automated workflow
 
-This section will guide you through running the XR-Seq and Damage-Seq pipeline using Snakemake, a workflow management system. Detailed instructions and code examples can be found in the provided github link: <https://github.com/CompGenomeLab/xr-ds-seq-snakemake>
+If you prefer an automated version of the steps in this tutorial, see the Snakemake workflow:
+
+- Repository: `https://github.com/CompGenomeLab/xr-ds-seq-snakemake`
+
+It orchestrates genome preparation, QC, adapter handling, alignment, BED conversions, Damage-seq motif filtering, coverage track generation, simulations, and downstream summaries. Use it when you need a fully reproducible, end-to-end run with minimal manual intervention.
+

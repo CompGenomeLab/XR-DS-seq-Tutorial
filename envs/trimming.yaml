@@ -1,0 +1,9 @@
+name: trimming
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - cutadapt
+
+

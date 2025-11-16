@@ -1,0 +1,9 @@
+name: boquila
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - boquila
+
+
