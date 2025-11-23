@@ -141,30 +141,30 @@ conda activate mapping
 ```
 
 Next, prepare the reference genome.
-The compressed C. elegans (WBcel235/ce11) reference is already provided at `ref_genome/Celegans.fa.gz`. Decompress it if needed:
+The compressed C. elegans (WBcel235/ce11) reference is already provided at `ref_genome/GCF_000002985.6_WBcel235_genomic.fna.gz`. Decompress it if needed:
 
 ```bash
-gunzip -f ref_genome/Celegans.fa.gz
+gunzip -f ref_genome/GCF_000002985.6_WBcel235_genomic.fna.gz
 ```
 
 After downloading the genome fasta file, you should generate the index files for bowtie2
 which is crucial for efficiently reducing computational time and improving alignment quality.
 
 ```bash
-bowtie2-build --threads 8 ref_genome/Celegans.fa ref_genome/Bowtie2/genome_Celegans
+bowtie2-build --threads 8 ref_genome/GCF_000002985.6_WBcel235_genomic.fna ref_genome/Bowtie2/genome_Celegans
 ```
 
 You will create another index file via samtools to retrieve sequence information based on genomic coordinates or sequence identifiers.
 
 ```bash
-samtools faidx ref_genome/Celegans.fa
+samtools faidx ref_genome/GCF_000002985.6_WBcel235_genomic.fna
 ```
 
 Next, the index file created by samtools will be converted to a ron file (a different format of the index).
 This file will be useful when we simulate our samples with boquila.
 
 ```bash
-python3 scripts/idx2ron.py -i ref_genome/Celegans.fa.fai -o ref_genome/Celegans.ron -l genome_idex2ron.log
+python3 scripts/idx2ron.py -i ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -o ref_genome/WBcel235.ron -l genome_idex2ron.log
 ```
 
 ## Quality control
@@ -182,8 +182,8 @@ Then you can create a directory for the output of FastQC with `mkdir qc/` comman
 Lastly, you can run the command below to execute the tool for both Damage-seq and XR-seq samples:
 
 ```bash
-fastqc -t 8 --outdir qc/ samples/ce_ds.fastq.gz
-fastqc -t 8 --outdir qc/ samples/ce_xr.fastq.gz
+fastqc -t 8 --outdir qc/ samples/celeg_ds_64.fastq.gz
+fastqc -t 8 --outdir qc/ samples/celeg_xr_64.fastq.gz
 
 multiqc qc/ -o qc/
 ```
@@ -201,14 +201,20 @@ In Damage-seq, discard reads containing adapters (indicative of no lesion).
 In XR-seq, trim adapters and keep the trimmed reads.
 
 ```bash
-cutadapt -j 8 -g GACTGGTTCCAATTGAAAGTGCTCTTCCGATCT --discard-trimmed -o results/ds.trim.fastq.gz samples/ce_ds.fastq.gz
+cutadapt -j 8 -g GACTGGTTCCAATTGAAAGTGCTCTTCCGATCT --discard-trimmed -o results/ds.trim.fastq.gz samples/celeg_ds_64.fastq.gz
 
-cutadapt -j 8 -a TGGAATTCTCGGGTGCCAAGGAACTCCAGTNNNNNNACGATCTCGTATGCCGTCTTCTGCTTG -o results/xr.trim.fastq.gz samples/ce_xr.fastq.gz
+cutadapt -j 8 -a TGGAATTCTCGGGTGCCAAGGAACTCCAGTNNNNNNACGATCTCGTATGCCGTCTTCTGCTTG -o results/xr.trim.fastq.gz samples/celeg_xr_64.fastq.gz
 ```
 
 ## Mapping, removing duplicates, quality trimming, and converting to bed
 
 This section covers the steps involved in mapping the preprocessed reads to the reference genome using Bowtie2, converting the mapped reads to BAM format, and extracting BED files.
+
+Activate the `mapping` environment (includes bowtie2, samtools, picard):
+
+```bash
+conda activate mapping
+```
 
 Initially we will align our reads to the reference genome using the prepared index files.
 After that we will convert the output sam files to bam.
@@ -223,11 +229,7 @@ samtools view -Sbh -o results/ds.bam results/ds.sam
 samtools view -Sbh -o results/xr.bam results/xr.sam
 ```
 
-In the next part, we will remove the duplicate reads with picard. Activate the `mapping` environment (includes bowtie2, samtools, picard):
-
-```bash
-conda activate mapping
-```
+In the next part, we will remove the duplicate reads with picard.
 
 To run Picard MarkDuplicates,
 you need your files to be ordered by their header.
@@ -247,8 +249,6 @@ Lastly, we will remove low quality reads (MAPQ score < 20) via samtools and
 use bedtools to convert our bam files into bed format.
 
 ```bash
-# Mapping env for samtools filtering
-conda activate mapping
 samtools index results/ds.dedup.bam
 samtools view -q 20 -b results/ds.dedup.bam > results/ds.q20.bam
 
@@ -273,12 +273,12 @@ sort -k1,1 -k2,2n -k3,3n results/xr.bed > results/xr.sorted.bed
 
 ## Filtering for chromosomes
 
-Reads that are aligned to regions other than chromosomes 1-22 and X are filtered and the rest is kept for further analysis.
+Reads that are aligned to regions other than chromosomes I-V and X are filtered and the rest is kept for further analysis.
 
 ```bash
-grep "^chr" results/ds.sorted.bed | grep -v -e "chrY" -e "chrM" > results/ds.sorted.chr.bed
+grep "^chr" results/ds.sorted.bed | grep -v "chrDiscard" > results/ds.sorted.chr.bed
 
-grep "^chr" results/xr.sorted.bed | grep -v -e "chrY" -e "chrM" > results/xr.sorted.chr.bed
+grep "^chr" results/xr.sorted.bed | grep -v "chrDiscard" > results/xr.sorted.chr.bed
 ```
 
 ## Separating strands
@@ -298,7 +298,7 @@ The reads in the BED files are separated according to which strand they were map
 Due to the experimental protocol of Damage-seq, the damaged dipyrimidines are located at the two bases upstream of the reads. We use [bedtools flank](https://bedtools.readthedocs.io/en/latest/content/tools/flank.html) and [bedtools slop](https://bedtools.readthedocs.io/en/latest/content/tools/slop.html) to obtain 10-nucleotide long read locations with the damaged nucleotides at 5th and 6th positions.
 
 ```bash
-    cut -f1,2 ref_genome/Celegans.fa.fai > ref_genome/sizes.chrom
+    cut -f1,2 ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai > ref_genome/sizes.chrom
 
     bedtools flank -i  results/ds.sorted.chr.plus.bed -g ref_genome/sizes.chrom -l 6 -r 0 > results/ds.plus.flank.bed
     bedtools flank -i results/ds.sorted.chr.minus.bed -g ref_genome/sizes.chrom -l 0 -r 6 > results/ds.minus.flank.bed
@@ -318,8 +318,8 @@ Due to the experimental protocol of Damage-seq, the damaged dipyrimidines are lo
 To convert BED files to FASTA format:
 
 ```bash
-    bedtools getfasta -fi ref_genome/Celegans.fa -bed results/ds.plus.10.bed -fo results/ds.plus.10.fa -s
-    bedtools getfasta -fi ref_genome/Celegans.fa -bed results/ds.minus.10.bed -fo results/ds.minus.10.fa -s
+    bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/ds.plus.10.bed -fo results/ds.plus.10.fa -s
+    bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/ds.minus.10.bed -fo results/ds.minus.10.fa -s
 ```
 
 ### Filtering Damage-seq data by motif
@@ -355,9 +355,9 @@ In addition, we count the reads in the BED files and use this count in the follo
 We check the reads for the enrichment of nucleotides and dinucleotides at specific positions.
 
 ```bash
-    bedtools getfasta -fi ref_genome/Celegans.fa -bed results/ds.dipy.bed -fo results/ds.dipy.fa -s
+    bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/ds.dipy.bed -fo results/ds.dipy.fa -s
 
-    bedtools getfasta -fi ref_genome/Celegans.fa -bed results/xr.sorted.chr.bed -fo results/xr.fa -s
+    bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/xr.sorted.chr.bed -fo results/xr.fa -s
 
     python3 scripts/fa2kmerAbundanceTable.py -i results/ds.dipy.fa -k 1 -o results/ds.dipy.nt.txt
 
@@ -373,13 +373,13 @@ The first step for generation of BigWig files from BED files is generating BedGr
 ```bash
     # BedGraph generation with bedtools (bedops env)
     conda activate bedops
-    bedtools genomecov -i results/ds.dipy.plus.bed -g ref_genome/Celegans.fa.fai -bg -scale $(cat results/ds.dipy.count.txt | awk '{print 1000000/$1}') > results/ds.dipy.plus.bdg
+    bedtools genomecov -i results/ds.dipy.plus.bed -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/ds.dipy.count.txt | awk '{print 1000000/$1}') > results/ds.dipy.plus.bdg
     
-    bedtools genomecov -i results/ds.dipy.minus.bed -g ref_genome/Celegans.fa.fai -bg -scale $(cat results/ds.dipy.count.txt | awk '{print 1000000/$1}') > results/ds.dipy.minus.bdg
+    bedtools genomecov -i results/ds.dipy.minus.bed -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/ds.dipy.count.txt | awk '{print 1000000/$1}') > results/ds.dipy.minus.bdg
 
-    bedtools genomecov -i results/xr.sorted.chr.plus.bed -g ref_genome/Celegans.fa.fai -bg -scale $(cat results/xr.count.txt | awk '{print 1000000/$1}') > results/xr.plus.bdg        
+    bedtools genomecov -i results/xr.sorted.chr.plus.bed -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/xr.count.txt | awk '{print 1000000/$1}') > results/xr.plus.bdg        
     
-    bedtools genomecov -i results/xr.sorted.chr.minus.bed -g ref_genome/Celegans.fa.fai -bg -scale $(cat results/xr.count.txt | awk '{print 1000000/$1}') > results/xr.minus.bdg
+    bedtools genomecov -i results/xr.sorted.chr.minus.bed -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/xr.count.txt | awk '{print 1000000/$1}') > results/xr.minus.bdg
 ```
 
 Then, from these BedGraph files, we generate BigWig files.
@@ -396,11 +396,11 @@ Then, from these BedGraph files, we generate BigWig files.
 ```bash
     # Convert to BigWig (ucsc env)
     conda activate ucsc
-    bedGraphToBigWig results/ds.dipy.plus.sorted.bdg ref_genome/Celegans.fa.fai results/ds.dipy.plus.bw
-    bedGraphToBigWig results/ds.dipy.minus.sorted.bdg ref_genome/Celegans.fa.fai results/ds.dipy.minus.bw
+    bedGraphToBigWig results/ds.dipy.plus.sorted.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/ds.dipy.plus.bw
+    bedGraphToBigWig results/ds.dipy.minus.sorted.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/ds.dipy.minus.bw
 
-    bedGraphToBigWig results/xr.plus.sorted.bdg ref_genome/Celegans.fa.fai results/xr.plus.bw
-    bedGraphToBigWig results/xr.minus.sorted.bdg ref_genome/Celegans.fa.fai results/xr.minus.bw
+    bedGraphToBigWig results/xr.plus.sorted.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/xr.plus.bw
+    bedGraphToBigWig results/xr.minus.sorted.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/xr.minus.bw
 ```
 
 ## Simulating the sample reads
@@ -410,9 +410,9 @@ Because CPD and (6-4)PP damage types require certain nucleotides in certain posi
 ```bash
     conda activate boquila
 
-    boquila --fasta results/ds.dipy.fa --bed results/ds.sim.bed --ref ref_genome/Celegans.fa --regions ref_genome/Celegans.ron --kmer 2 --seed 1 --sens 2 > results/ds.sim.fa
+    boquila --fasta results/ds.dipy.fa --bed results/ds.sim.bed --ref ref_genome/GCF_000002985.6_WBcel235_genomic.fna --regions ref_genome/WBcel235.ron --kmer 2 --seed 1 --sens 2 > results/ds.sim.fa
 
-    boquila --fasta results/xr.fa --bed results/xr.sim.bed --ref ref_genome/Celegans.fa --regions ref_genome/Celegans.ron --kmer 2 --seed 1 --sens 2 > results/xr.sim.fa
+    boquila --fasta results/xr.fa --bed results/xr.sim.bed --ref ref_genome/GCF_000002985.6_WBcel235_genomic.fna --regions ref_genome/WBcel235.ron --kmer 2 --seed 1 --sens 2 > results/xr.sim.fa
 ```
 
 ```bash
@@ -428,15 +428,15 @@ The read counts from the simulated Damage-seq and XR-seq data are then used to n
 ```bash
     grep -c '^' results/xr.sim.bed > results/xr.sim.count.txt
 
-    bedtools genomecov -i results/xr.sim.plus.bed -g ref_genome/Celegans.fa.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.plus.bdg
+    bedtools genomecov -i results/xr.sim.plus.bed -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.plus.bdg
     
-    bedtools genomecov -i results/xr.sim.minus.bed -g ref_genome/Celegans.fa.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.minus.bdg
+    bedtools genomecov -i results/xr.sim.minus.bed -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.minus.bdg
 
     sort -k1,1 -k2,2n results/xr.sim.plus.bdg > results/xr.sim.plus.sorted.bdg
     sort -k1,1 -k2,2n results/xr.sim.minus.bdg > results/xr.sim.minus.sorted.bdg
 
-    bedGraphToBigWig results/xr.sim.plus.sorted.bdg ref_genome/Celegans.fa.fai results/xr.sim.plus.bw
-    bedGraphToBigWig results/xr.sim.minus.sorted.bdg ref_genome/Celegans.fa.fai results/xr.sim.minus.bw
+    bedGraphToBigWig results/xr.sim.plus.sorted.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/xr.sim.plus.bw
+    bedGraphToBigWig results/xr.sim.minus.sorted.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/xr.sim.minus.bw
 ```
 
 ## Plotting length distribution, nucleotide enrichment, and BAM correlations

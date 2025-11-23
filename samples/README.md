@@ -2,8 +2,8 @@
 
 Place the input FASTQ files here. This tutorial assumes:
 
-- `ce_ds.fastq.gz` — Damage-seq reads (C. elegans, wild-type)
-- `ce_xr.fastq.gz` — XR-seq reads (C. elegans, wild-type)
+- `celeg_ds_64.fastq.gz` — Damage-seq reads (C. elegans, wild-type, (6-4)PP)
+- `celeg_xr_64.fastq.gz` — XR-seq reads (C. elegans, wild-type, (6-4)PP)
 
 Notes:
 
