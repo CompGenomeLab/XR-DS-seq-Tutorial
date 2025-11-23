@@ -167,4 +167,5 @@ results/*
 qc/
 ref_genome/*
 !ref_genome/GCF_000002985.6_WBcel235_genomic.fna.gz
+!ref_genome/celeg_genes.bed
 !ref_genome/README.md

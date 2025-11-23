@@ -135,6 +135,11 @@ class fasta:
 
 	def getKmerAbundance(self, kmer, firstNletters=None):
 		nucleotides = 'ATGC'
+		# Normalize firstNletters before use
+		if firstNletters is None:
+			firstNletters = self.getMaxSeqLength()
+		else:
+			firstNletters = int(firstNletters)
 		subseqTupleList = itertools.product(nucleotides, repeat=int(kmer))
 		subseqList = sorted(list(subseqTupleList))
 
@@ -150,11 +155,6 @@ class fasta:
 				subseq = sequence[i : i + kmer]
 				if subseqHasValidNucleotides(subseq):
 							theDict[i + 1][subseq.upper()] += 1
-
-			if firstNletters is None:
-				firstNletters = self.getMaxSeqLength()
-			else:
-				firstNletters = int(firstNletters)
 
 		positionDict = {}
 		for i in range(1, firstNletters + 1 - (kmer - 1)):

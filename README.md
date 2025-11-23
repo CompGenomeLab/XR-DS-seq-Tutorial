@@ -350,20 +350,6 @@ In addition, we count the reads in the BED files and use this count in the follo
     grep -c "^" results/xr.sorted.chr.bed > results/xr.count.txt
 ```
 
-### Assessing nucleotide content
-
-We check the reads for the enrichment of nucleotides and dinucleotides at specific positions.
-
-```bash
-    bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/ds.dipy.bed -fo results/ds.dipy.fa -s
-
-    bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/xr.sorted.chr.bed -fo results/xr.fa -s
-
-    python3 scripts/fa2kmerAbundanceTable.py -i results/ds.dipy.fa -k 1 -o results/ds.dipy.nt.txt
-
-    python3 scripts/fa2kmerAbundanceTable.py -i results/xr.fa -k 1 -o results/xr.nt.txt
-```
-
 ### Generating BigWig files
 
 BigWig file format includes representation of the distribution reads in each genomic window without respect to plus and minus strands. It is a compact file format that is required for many tools in the further analysis steps.
@@ -371,8 +357,6 @@ BigWig file format includes representation of the distribution reads in each gen
 The first step for generation of BigWig files from BED files is generating BedGraph files. Since the strands of the reads are not taken into account in the BigWig and BedGraph files
 
 ```bash
-    # BedGraph generation with bedtools (bedops env)
-    conda activate bedops
     bedtools genomecov -i results/ds.dipy.plus.bed -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/ds.dipy.count.txt | awk '{print 1000000/$1}') > results/ds.dipy.plus.bdg
     
     bedtools genomecov -i results/ds.dipy.minus.bed -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/ds.dipy.count.txt | awk '{print 1000000/$1}') > results/ds.dipy.minus.bdg
@@ -410,9 +394,9 @@ Because CPD and (6-4)PP damage types require certain nucleotides in certain posi
 ```bash
     conda activate boquila
 
-    boquila --fasta results/ds.dipy.fa --bed results/ds.sim.bed --ref ref_genome/GCF_000002985.6_WBcel235_genomic.fna --regions ref_genome/WBcel235.ron --kmer 2 --seed 1 --sens 2 > results/ds.sim.fa
+    boquila --fasta results/ds.dipy.fa --bed results/ds.sim.bed --ref ref_genome/GCF_000002985.6_WBcel235_genomic.fna --regions ref_genome/WBcel235.ron --kmer 2 --seed 1 > results/ds.sim.fa
 
-    boquila --fasta results/xr.fa --bed results/xr.sim.bed --ref ref_genome/GCF_000002985.6_WBcel235_genomic.fna --regions ref_genome/WBcel235.ron --kmer 2 --seed 1 --sens 2 > results/xr.sim.fa
+    boquila --fasta results/xr.fa --bed results/xr.sim.bed --ref ref_genome/GCF_000002985.6_WBcel235_genomic.fna --regions ref_genome/WBcel235.ron --kmer 2 --seed 1 > results/xr.sim.fa
 ```
 
 ```bash
@@ -428,15 +412,14 @@ The read counts from the simulated Damage-seq and XR-seq data are then used to n
 ```bash
     grep -c '^' results/xr.sim.bed > results/xr.sim.count.txt
 
-    bedtools genomecov -i results/xr.sim.plus.bed -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.plus.bdg
+    conda activate bedops
+    sort -k1,1 -k2,2n results/xr.sim.plus.bed | grep -v "^chrDiscard" | bedtools genomecov -i - -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.plus.bdg
     
-    bedtools genomecov -i results/xr.sim.minus.bed -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.minus.bdg
+    sort -k1,1 -k2,2n results/xr.sim.minus.bed | grep -v "^chrDiscard" | bedtools genomecov -i - -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.minus.bdg
 
-    sort -k1,1 -k2,2n results/xr.sim.plus.bdg > results/xr.sim.plus.sorted.bdg
-    sort -k1,1 -k2,2n results/xr.sim.minus.bdg > results/xr.sim.minus.sorted.bdg
-
-    bedGraphToBigWig results/xr.sim.plus.sorted.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/xr.sim.plus.bw
-    bedGraphToBigWig results/xr.sim.minus.sorted.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/xr.sim.minus.bw
+    conda activate ucsc
+    bedGraphToBigWig results/xr.sim.plus.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/xr.sim.plus.bw
+    bedGraphToBigWig results/xr.sim.minus.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/xr.sim.minus.bw
 ```
 
 ## Plotting length distribution, nucleotide enrichment, and BAM correlations
@@ -460,29 +443,33 @@ Plot a histogram of read lengths to confirm expected fragment sizes for XR/DS li
     ggsave("results/xrLenDistPlot.png")
 ```
 
-### Plotting nucleotide enrichment of the reads
+### Assessing and Plotting nucleotide enrichment of the reads
+
+We check the reads for the enrichment of nucleotides and dinucleotides at specific positions.
+
+```bash
+    conda activate bedops
+    bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/ds.dipy.bed -fo results/ds.dipy.fa -s
+
+    awk '($3-$2==24){print}' results/xr.sorted.chr.bed > results/xr.sorted.24.bed
+    bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/xr.sorted.24.bed -fo results/xr.fa -s
+
+    python3 scripts/fa2kmerAbundanceTable.py -i results/ds.dipy.fa -k 1 -o results/ds.dipy.nt.txt
+    python3 scripts/fa2kmerAbundanceTable.py -i results/ds.dipy.fa -k 2 -o results/ds.dipy.di.txt
+
+    python3 scripts/fa2kmerAbundanceTable.py -i results/xr.fa -k 1 -o results/xr.nt.txt
+    python3 scripts/fa2kmerAbundanceTable.py -i results/xr.fa -k 2 -o results/xr.di.txt
+```
 
 Because Damage-seq and XR-seq have characteristic sequence features, plot per-position nucleotide enrichment as a quality check.
 
-```R
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-
-nucl_content <- read.table("results/xr.nt.txt", header=TRUE)
-nucl_content_gathered <- gather(nucl_content, nucl, count, -kmer)
-nucl_content_gathered$nucl <- factor(nucl_content_gathered$nucl,
-    levels = c("X1","X2","X3","X4","X5","X6","X7","X8","X9","X10","X11","X12","X13","X14","X15","X16","X17","X18","X19","X20","X21","X22","X23","X24","X25","X26","X27"),
-    labels = c("1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27"))
-nucl_content_gathered$kmer <- factor(nucl_content_gathered$kmer, levels = c("C","T","G","A"))
-
-xrNuclPlot <- ggplot(data = nucl_content_gathered, aes(x = nucl, y = count, fill = kmer)) +
-    geom_bar(position = "fill", stat='identity') +
-    xlab("Position") +
-    ylab("Count") +
-    labs(fill = "") +
-    scale_fill_manual(values = c("seagreen3","gray60","steelblue2","steelblue4"))
-ggsave("results/xrNuclPlot.png", xrNuclPlot, width = 8, height = 4, dpi = 150)
+```bash
+    conda activate rplots
+    Rscript scripts/plot_kmer_content.R -i results/xr.nt.txt -k 1 -o results/xr_nuc.png -s "XR-seq nucleotide content" -l results/xr_nuc.log
+    Rscript scripts/plot_kmer_content.R -i results/ds.dipy.nt.txt -k 1 -o results/ds_nuc.png -s "DS-seq nucleotide content" -l results/ds_nuc.log
+    
+    Rscript scripts/plot_kmer_content.R -i results/ds.dipy.di.txt -k 2 -o results/ds_dinuc.png -s "DS-seq dinucleotide content" -l results/ds_dinuc.log -f "CC,CT,TC,TT"
+    Rscript scripts/plot_kmer_content.R -i results/xr.di.txt -k 2 -o results/xr_dinuc.png -s "XR-seq dinucleotide content" -l results/xr_dinuc.log -f "CC,CT,TC,TT"
 ```
 
 ### Bam correlations
@@ -504,7 +491,7 @@ Assess data quality by comparing replicates and conditions. Replicates should co
 ```bash
     bigwigCompare --bigwig1 results/xr.plus.bw --bigwig2 results/xr.sim.plus.bw --operation ratio --outFileFormat bigwig --outFileName results/xr.norm_sim.plus.bw
 
-    computeMatrix scale-regions -S results/xr.norm_sim.plus.bw -R ref_genome/Celegans_genes.bed --outFileName results/xr.norm_sim.plus.on_genes.computeMatrix.out -b 1000 -a 1000 --smartLabels
+    computeMatrix scale-regions -S results/xr.norm_sim.plus.bw -R ref_genome/celeg_genes.bed --outFileName results/xr.norm_sim.plus.on_genes.computeMatrix.out -b 1000 -a 1000 --smartLabels
 
     plotHeatmap --matrixFile results/xr.norm_sim.plus.on_genes.computeMatrix.out --outFileName results/xr.norm_sim.plus.on_genes.heatmap_k2.png --xAxisLabel "Position with respect to genes" --yAxisLabel "Genes" --kmeans 2 --heatmapWidth 10 --startLabel "Start" --endLabel "End"
 ```
