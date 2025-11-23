@@ -29,6 +29,9 @@ Requirements:
 
 - Example FASTQs in `samples/`; outputs under `results/`.
 - Reference genome in `ref_genome/` (this tutorial uses C. elegans WBcel235/ce11).
+- Example dataset (tutorial files are 1,000,000‑read subsamples):
+  - Damage‑seq example (WT L1 0 h (6‑4)PP Rep1): [GSM8595180](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM8595180)
+  - XR‑seq example (WT L1 5 min (6‑4)PP Rep1): [GSM8595202](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM8595202)
 
 ### Introduction to XR-seq
 
