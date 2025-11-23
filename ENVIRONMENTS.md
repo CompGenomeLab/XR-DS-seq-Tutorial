@@ -3,7 +3,7 @@
 This guide provides multiple small conda environments for different stages of the XR-seq and Damage-seq manual analysis. Keeping tools isolated reduces solver conflicts and makes it easy to switch between steps.
 
 Initially, you will create and activate a conda environment to set up the necessary dependencies for running the tutorial.
-If you haven't downloaded conda yet, you can find the instructions in the [link](https://conda.io/projects/conda/en/stable/user-guide/install/download.html).
+If you haven't downloaded conda yet, see the [Conda installation guide](https://conda.io/projects/conda/en/stable/user-guide/install/download.html).
 
 Before creating any environment:
 
@@ -109,5 +109,3 @@ conda env remove -n deeptools
 - Solver conflicts: try creating the specific environment alone, or use micromamba for faster solves.
 - Package not found on arm64: try `conda config --env --set subdir osx-64` inside that env before install, or use a container for that step.
 - Path issues after switching envs: make sure to `conda deactivate` before `conda activate` another.
-
-

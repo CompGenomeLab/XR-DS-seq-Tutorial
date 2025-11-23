@@ -159,17 +159,11 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Ignore raw samples
-samples/HXACA4_TGACCA.fastq
-samples/HDACA6_GCCAAT.fastq
-
 .DS_Store
 
 # Ignore results
-results/
+results/*
 !results/README.md
 qc/
 ref_genome/*
-!ref_genome/Bowtie2/
-ref_genome/Bowtie2/*
-!ref_genome/Bowtie2/README.md
+!ref_genome/README.md

@@ -3,13 +3,18 @@
 
 This tutorial focuses on the manual analysis of XR-seq and Damage-seq data from raw reads to genome-wide tracks and quality control plots. Use the sections below for step-by-step commands.
 
+## Introduction
+
 Prerequisites:
+
 - A GitHub account (for obtaining materials and sharing results). Create one at [https://github.com/join](https://github.com/join).
 - Linux environment is recommended. If you are not on Linux, please follow our WSL setup guide: [wsl_vscode_github.pdf](wsl_vscode_github.pdf).
 - [Visual Studio Code](https://code.visualstudio.com/) is highly recommended (not mandatory) for the exercises and file navigation.
 - Conda environments should be installed and ready-to-use (see [ENVIRONMENTS.md](ENVIRONMENTS.md)).
+- R is required for plotting. Recommended: use VS Code with the [R extension](https://marketplace.visualstudio.com/items?itemName=REditorSupport.r). Alternatively, install [R](https://www.r-project.org/) and [RStudio Desktop](https://posit.co/download/rstudio-desktop/).
 
 Outline:
+
 - Concepts: XR vs DS signals, strand conventions, lesion/products.
 - QC: FastQC/MultiQC.
 - Adapter handling: cutadapt (XR trim-and-keep; DS discard-trim).
@@ -21,8 +26,9 @@ Outline:
 - Advanced: simulation-based controls with boquila.
 
 Requirements:
+
 - Example FASTQs in `samples/`; outputs under `results/`.
-- Reference genome in `ref_genome/` (instructions below use GRCh38 p14).
+- Reference genome in `ref_genome/` (this tutorial uses C. elegans WBcel235/ce11).
 
 ### Introduction to XR-seq
 
@@ -45,21 +51,20 @@ Damage-seq maps DNA lesions (e.g., CPD, (6-4)PP) by capturing polymerase-arreste
 ### Further reading
 
 - Hu, J., Li, W., Adebali, O., et al. Genome-wide mapping of nucleotide excision repair with XR-seq. Nature Protocols 14, 248–282 (2019). A detailed, step-by-step XR-seq laboratory and analysis protocol with practical considerations and preliminary analysis examples.  
-  Link: https://www.nature.com/articles/s41596-018-0093-7
+  Link: <https://www.nature.com/articles/s41596-018-0093-7>
 
 - Hu, J., Adar, S., Selby, C. P., Lieb, J. D. & Sancar, A. Genome-wide analysis of human global and transcription-coupled excision repair of UV damage at single-nucleotide resolution. Genes & Development 29, 948–960 (2015). Introduces single-nucleotide–resolution repair maps, separating global and transcription-coupled repair components in human cells.  
-  Link: https://genesdev.cshlp.org/content/29/9/948
+  Link: <https://genesdev.cshlp.org/content/29/9/948>
 
 - Adar, S., Hu, J., Lieb, J. D. & Sancar, A. Genome-wide kinetics of DNA excision repair in relation to chromatin state and mutagenesis. PNAS (2016). Quantifies excision repair kinetics genome-wide and relates repair dynamics to chromatin features and mutational patterns.  
-  Link: https://www.pnas.org/doi/10.1073/pnas.1614430113
+  Link: <https://www.pnas.org/doi/10.1073/pnas.1614430113>
 
 - Li, W., Hu, J., et al. (2017) PNAS. Extends genome-wide mapping by integrating UV damage formation and repair dynamics to reveal determinants of repair heterogeneity.  
-  Link: https://www.pnas.org/doi/10.1073/pnas.1706522114
-
+  Link: <https://www.pnas.org/doi/10.1073/pnas.1706522114>
 
 ## NGS File Format
 
-This section explains the file formats that you will encounter troughout the tutorial. You can find more detail about each of these formats together with others from the [link](https://genome.ucsc.edu/FAQ/FAQformat.html).
+This section explains the file formats that you will encounter throughout the tutorial. For more details, see the [UCSC File Format FAQ](https://genome.ucsc.edu/FAQ/FAQformat.html).
 
 - FASTQ:
 
@@ -125,38 +130,38 @@ mkdir -p ref_genome/Bowtie2 results qc
 
 ## Downloading reference genome and generating related files
 
-This section provides commands to download a reference genome (GRCh38) and generate related files.
+This section provides commands to download a reference genome and generate related files.
 For alignment and BAM operations, activate the mapping environment:
 
 ```bash
 conda activate mapping
 ```
 
-Next, you will download the reference genome.
-Because you will analyze results/HeLa cells that are a type of human cancer cells (derived from cervical cancer cells), GRCh38 genome is chosen as the reference:
+Next, prepare the reference genome.
+The compressed C. elegans (WBcel235/ce11) reference is already provided at `ref_genome/Celegans.fa.gz`. Decompress it if needed:
 
 ```bash
-wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_48/GRCh38.p14.genome.fa.gz -O ref_genome/GRCh38.fa.gz && gunzip -f ref_genome/GRCh38.fa.gz
+gunzip -f ref_genome/Celegans.fa.gz
 ```
 
 After downloading the genome fasta file, you should generate the index files for bowtie2
 which is crucial for efficiently reducing computational time and improving alignment quality.
 
 ```bash
-bowtie2-build --threads 8 ref_genome/GRCh38.fa ref_genome/Bowtie2/genome_GRCh38
+bowtie2-build --threads 8 ref_genome/Celegans.fa ref_genome/Bowtie2/genome_Celegans
 ```
 
 You will create another index file via samtools to retrieve sequence information based on genomic coordinates or sequence identifiers.
 
 ```bash
-samtools faidx ref_genome/GRCh38.fa
+samtools faidx ref_genome/Celegans.fa
 ```
 
 Next, the index file created by samtools will be converted to a ron file (a different format of the index).
 This file will be useful when we simulate our samples with boquila.
 
 ```bash
-python3 scripts/idx2ron.py -i ref_genome/GRCh38.fa.fai -o ref_genome/GRCh38.ron -l genome_idex2ron.log
+python3 scripts/idx2ron.py -i ref_genome/Celegans.fa.fai -o ref_genome/Celegans.ron -l genome_idex2ron.log
 ```
 
 ## Quality control
@@ -174,30 +179,28 @@ Then you can create a directory for the output of FastQC with `mkdir qc/` comman
 Lastly, you can run the command below to execute the tool for both Damage-seq and XR-seq samples:
 
 ```bash
-fastqc -t 8 --outdir qc/ samples/hela_ds_cpd.fq 
-
-fastqc -t 8 --outdir qc/ samples/hela_xr_cpd.fq 
+fastqc -t 8 --outdir qc/ samples/ce_ds.fastq.gz
+fastqc -t 8 --outdir qc/ samples/ce_xr.fastq.gz
 
 multiqc qc/ -o qc/
 ```
 
-## Adaptor handling
+## Adapter handling
 
-This section demonstrates how to handle adaptors in the NGS data using Cutadapt, a tool for trimming adaptor sequences and other contaminants. Activate the `trimming` environment:
+This section demonstrates how to handle adapters in NGS data using cutadapt, a tool for trimming adapter sequences and other contaminants. Activate the `trimming` environment:
 
 ```bash
 conda activate trimming
 ```
 
 At this stage, we will perform different tasks for Damage-seq and XR-seq.
-In Damage-seq we want to discard all the reads with adaptors
-since having the adaptor in Damage-seq reads mean that the read does not contain any damage.
-In the case of XR-seq, we will only trim the adaptors from the reads and keep the trimmed ones.
+In Damage-seq, discard reads containing adapters (indicative of no lesion).
+In XR-seq, trim adapters and keep the trimmed reads.
 
 ```bash
-cutadapt -j 8 -g GACTGGTTCCAATTGAAAGTGCTCTTCCGATCT --discard-trimmed -o results/ds.trim.fq samples/hela_ds_cpd.fq
+cutadapt -j 8 -g GACTGGTTCCAATTGAAAGTGCTCTTCCGATCT --discard-trimmed -o results/ds.trim.fastq.gz samples/ce_ds.fastq.gz
 
-cutadapt -j 8 -a TGGAATTCTCGGGTGCCAAGGAACTCCAGTNNNNNNACGATCTCGTATGCCGTCTTCTGCTTG -o results/xr.trim.fq samples/hela_xr_cpd.fq
+cutadapt -j 8 -a TGGAATTCTCGGGTGCCAAGGAACTCCAGTNNNNNNACGATCTCGTATGCCGTCTTCTGCTTG -o results/xr.trim.fastq.gz samples/ce_xr.fastq.gz
 ```
 
 ## Mapping, removing duplicates, quality trimming, and converting to bed
@@ -208,11 +211,11 @@ Initially we will align our reads to the reference genome using the prepared ind
 After that we will convert the output sam files to bam.
 
 ```bash
-(bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_GRCh38 -U results/ds.trim.fq -S results/ds.sam)
+(bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_Celegans -U results/ds.trim.fastq.gz -S results/ds.sam)
 
 samtools view -Sbh -o results/ds.bam results/ds.sam
 
-(bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_GRCh38 -U results/xr.trim.fq -S results/xr.sam)
+(bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_Celegans -U results/xr.trim.fastq.gz -S results/xr.sam)
 
 samtools view -Sbh -o results/xr.bam results/xr.sam
 ```
@@ -223,7 +226,7 @@ In the next part, we will remove the duplicate reads with picard. Activate the `
 conda activate mapping
 ```
 
-To run MarkDplicates command of picard (this command will remove the duplicates for us),
+To run Picard MarkDuplicates,
 you need your files to be ordered by their header.
 For that purpose, you should sort the files and then use picard.
 
@@ -292,7 +295,7 @@ The reads in the BED files are separated according to which strand they were map
 Due to the experimental protocol of Damage-seq, the damaged dipyrimidines are located at the two bases upstream of the reads. We use [bedtools flank](https://bedtools.readthedocs.io/en/latest/content/tools/flank.html) and [bedtools slop](https://bedtools.readthedocs.io/en/latest/content/tools/slop.html) to obtain 10-nucleotide long read locations with the damaged nucleotides at 5th and 6th positions.
 
 ```bash
-    cut -f1,2 ref_genome/GRCh38.fa.fai > ref_genome/sizes.chrom
+    cut -f1,2 ref_genome/Celegans.fa.fai > ref_genome/sizes.chrom
 
     bedtools flank -i  results/ds.sorted.chr.plus.bed -g ref_genome/sizes.chrom -l 6 -r 0 > results/ds.plus.flank.bed
     bedtools flank -i results/ds.sorted.chr.minus.bed -g ref_genome/sizes.chrom -l 0 -r 6 > results/ds.minus.flank.bed
@@ -312,13 +315,13 @@ Due to the experimental protocol of Damage-seq, the damaged dipyrimidines are lo
 To convert BED files to FASTA format:
 
 ```bash
-    bedtools getfasta -fi ref_genome/GRCh38.fa -bed results/ds.plus.10.bed -fo results/ds.plus.10.fa -s
-    bedtools getfasta -fi ref_genome/GRCh38.fa -bed results/ds.minus.10.bed -fo results/ds.minus.10.fa -s
+    bedtools getfasta -fi ref_genome/Celegans.fa -bed results/ds.plus.10.bed -fo results/ds.plus.10.fa -s
+    bedtools getfasta -fi ref_genome/Celegans.fa -bed results/ds.minus.10.bed -fo results/ds.minus.10.fa -s
 ```
 
 ### Filtering Damage-seq data by motif
 
-Damage-seq reads are expected to contain C and T nucleotides at certain position due to the nature of the NER and Damage-seq experimental protocol. Therefore, we use this as an additional filtering step to eliminate the reads that don’t fit this criteria.
+Damage-seq reads are expected to contain C and T at specific positions around the lesion. Use this as an additional filter to remove reads that do not meet this criterion.
 
 ```bash
     python3 scripts/fa2bedByChoosingReadMotifs.py -i results/ds.plus.10.fa -o results/ds.dipy.plus.bed -r '.{4}(c|t|C|T){2}.{4}'
@@ -328,7 +331,8 @@ Damage-seq reads are expected to contain C and T nucleotides at certain position
 ```
 
 ### Obtaining read length distribution and read count
-In order see if our data contains the reads with lengths expected from the XR-seq or Damage-seq methods, read length distribution of the data should be extracted.
+
+To assess whether read lengths match expectations for XR-seq or Damage-seq, compute the read length distribution.
 
 ```bash
     awk '{print $3-$2}' results/ds.sorted.chr.bed | sort -k1,1n | uniq -c | sed 's/\s\s*/ /g' | awk '{print $2"\t"$1}' > results/ds.len.txt
@@ -336,7 +340,7 @@ In order see if our data contains the reads with lengths expected from the XR-se
     awk '{print $3-$2}' results/xr.sorted.chr.bed | sort -k1,1n | uniq -c | sed 's/\s\s*/ /g' | awk '{print $2"\t"$1}' > results/xr.len.txt
 ```
 
-In addition, we count the reads in the BED files and use this count in the following steps. 
+In addition, we count the reads in the BED files and use this count in the following steps.
 
 ```bash
     grep -c "^" results/ds.dipy.bed > results/ds.dipy.count.txt
@@ -344,12 +348,13 @@ In addition, we count the reads in the BED files and use this count in the follo
 ```
 
 ### Assessing nucleotide content
+
 We check the reads for the enrichment of nucleotides and dinucleotides at specific positions.
 
 ```bash
-    bedtools getfasta -fi ref_genome/GRCh38.fa -bed results/ds.dipy.bed -fo results/ds.dipy.fa -s
+    bedtools getfasta -fi ref_genome/Celegans.fa -bed results/ds.dipy.bed -fo results/ds.dipy.fa -s
 
-    bedtools getfasta -fi ref_genome/GRCh38.fa -bed results/xr.sorted.chr.bed -fo results/xr.fa -s
+    bedtools getfasta -fi ref_genome/Celegans.fa -bed results/xr.sorted.chr.bed -fo results/xr.fa -s
 
     python3 scripts/fa2kmerAbundanceTable.py -i results/ds.dipy.fa -k 1 -o results/ds.dipy.nt.txt
 
@@ -358,23 +363,23 @@ We check the reads for the enrichment of nucleotides and dinucleotides at specif
 
 ### Generating BigWig files
 
-BigWig file format includes representation of the distribution reads in each genomic window without respect to plus and minus strands. It is a compact file format that is required for many tools in the further analysis steps. 
+BigWig file format includes representation of the distribution reads in each genomic window without respect to plus and minus strands. It is a compact file format that is required for many tools in the further analysis steps.
 
 The first step for generation of BigWig files from BED files is generating BedGraph files. Since the strands of the reads are not taken into account in the BigWig and BedGraph files
 
 ```bash
     # BedGraph generation with bedtools (bedops env)
     conda activate bedops
-    bedtools genomecov -i results/ds.dipy.plus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/ds.dipy.count.txt | awk '{print 1000000/$1}') > results/ds.dipy.plus.bdg
+    bedtools genomecov -i results/ds.dipy.plus.bed -g ref_genome/Celegans.fa.fai -bg -scale $(cat results/ds.dipy.count.txt | awk '{print 1000000/$1}') > results/ds.dipy.plus.bdg
     
-    bedtools genomecov -i results/ds.dipy.minus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/ds.dipy.count.txt | awk '{print 1000000/$1}') > results/ds.dipy.minus.bdg
+    bedtools genomecov -i results/ds.dipy.minus.bed -g ref_genome/Celegans.fa.fai -bg -scale $(cat results/ds.dipy.count.txt | awk '{print 1000000/$1}') > results/ds.dipy.minus.bdg
 
-    bedtools genomecov -i results/xr.sorted.chr.plus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/xr.count.txt | awk '{print 1000000/$1}') > results/xr.plus.bdg        
+    bedtools genomecov -i results/xr.sorted.chr.plus.bed -g ref_genome/Celegans.fa.fai -bg -scale $(cat results/xr.count.txt | awk '{print 1000000/$1}') > results/xr.plus.bdg        
     
-    bedtools genomecov -i results/xr.sorted.chr.minus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/xr.count.txt | awk '{print 1000000/$1}') > results/xr.minus.bdg
+    bedtools genomecov -i results/xr.sorted.chr.minus.bed -g ref_genome/Celegans.fa.fai -bg -scale $(cat results/xr.count.txt | awk '{print 1000000/$1}') > results/xr.minus.bdg
 ```
 
-Then, from these BedGraph files, we generate BigWig files. 
+Then, from these BedGraph files, we generate BigWig files.
 
 ```bash
     # Sort BedGraphs (still in bedops env)
@@ -388,22 +393,23 @@ Then, from these BedGraph files, we generate BigWig files.
 ```bash
     # Convert to BigWig (ucsc env)
     conda activate ucsc
-    bedGraphToBigWig results/ds.dipy.plus.sorted.bdg ref_genome/GRCh38.fa.fai results/ds.dipy.plus.bw
-    bedGraphToBigWig results/ds.dipy.minus.sorted.bdg ref_genome/GRCh38.fa.fai results/ds.dipy.minus.bw
+    bedGraphToBigWig results/ds.dipy.plus.sorted.bdg ref_genome/Celegans.fa.fai results/ds.dipy.plus.bw
+    bedGraphToBigWig results/ds.dipy.minus.sorted.bdg ref_genome/Celegans.fa.fai results/ds.dipy.minus.bw
 
-    bedGraphToBigWig results/xr.plus.sorted.bdg ref_genome/GRCh38.fa.fai results/xr.plus.bw
-    bedGraphToBigWig results/xr.minus.sorted.bdg ref_genome/GRCh38.fa.fai results/xr.minus.bw
+    bedGraphToBigWig results/xr.plus.sorted.bdg ref_genome/Celegans.fa.fai results/xr.plus.bw
+    bedGraphToBigWig results/xr.minus.sorted.bdg ref_genome/Celegans.fa.fai results/xr.minus.bw
 ```
 
 ## Simulating the sample reads
+
 Because CPD and (6-4)PP damage types require certain nucleotides in certain positions, the genomic locations rich in adjacent CC, TC, CT or TT dinucleotides may be prone to receiving more UV damage while other regions that are poor in these dinucleotides receive less damage. Therefore, the sequence contents may bias our analysis results while comparing the damage formation or NER efficiency of two genomic regions. In order to eliminate the effect of  sequence content, we create synthetic sequencing data from the real Damage-seq and XR-seq data, which give us the expected damage counts and NER efficiencies, respectively, from the sequence content of the genomic areas of interest. We use [Boquila](https://github.com/CompGenomeLab/boquila) to generate simulated data.
 
 ```bash
     conda activate boquila
 
-    boquila --fasta results/ds.dipy.fa --bed results/ds.sim.bed --ref ref_genome/GRCh38.fa --regions ref_genome/GRCh38.ron --kmer 2 --seed 1 --sens 2 > results/ds.sim.fa
+    boquila --fasta results/ds.dipy.fa --bed results/ds.sim.bed --ref ref_genome/Celegans.fa --regions ref_genome/Celegans.ron --kmer 2 --seed 1 --sens 2 > results/ds.sim.fa
 
-    boquila --fasta results/xr.fa --bed results/xr.sim.bed --ref ref_genome/GRCh38.fa --regions ref_genome/GRCh38.ron --kmer 2 --seed 1 --sens 2 > results/xr.sim.fa
+    boquila --fasta results/xr.fa --bed results/xr.sim.bed --ref ref_genome/Celegans.fa --regions ref_genome/Celegans.ron --kmer 2 --seed 1 --sens 2 > results/xr.sim.fa
 ```
 
 ```bash
@@ -419,22 +425,22 @@ The read counts from the simulated Damage-seq and XR-seq data are then used to n
 ```bash
     grep -c '^' results/xr.sim.bed > results/xr.sim.count.txt
 
-    bedtools genomecov -i results/xr.sim.plus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.plus.bdg
+    bedtools genomecov -i results/xr.sim.plus.bed -g ref_genome/Celegans.fa.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.plus.bdg
     
-    bedtools genomecov -i results/xr.sim.minus.bed -g ref_genome/GRCh38.fa.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.minus.bdg
+    bedtools genomecov -i results/xr.sim.minus.bed -g ref_genome/Celegans.fa.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.minus.bdg
 
     sort -k1,1 -k2,2n results/xr.sim.plus.bdg > results/xr.sim.plus.sorted.bdg
     sort -k1,1 -k2,2n results/xr.sim.minus.bdg > results/xr.sim.minus.sorted.bdg
 
-    bedGraphToBigWig results/xr.sim.plus.sorted.bdg ref_genome/GRCh38.fa.fai results/xr.sim.plus.bw
-    bedGraphToBigWig results/xr.sim.minus.sorted.bdg ref_genome/GRCh38.fa.fai results/xr.sim.minus.bw
+    bedGraphToBigWig results/xr.sim.plus.sorted.bdg ref_genome/Celegans.fa.fai results/xr.sim.plus.bw
+    bedGraphToBigWig results/xr.sim.minus.sorted.bdg ref_genome/Celegans.fa.fai results/xr.sim.minus.bw
 ```
 
-## Plotting length distribution, nucleotide enrichment, and bam correlations
+## Plotting length distribution, nucleotide enrichment, and BAM correlations
 
 ### Plotting read length distribution
 
-We create a histogram of the read length distribution to clearly understand which read length is mostly found in our data. This information is used as a proof about the success of Damage-seq or XR-seq experiment in capturing the right reads. 
+Plot a histogram of read lengths to confirm expected fragment sizes for XR/DS libraries.
 
 ```bash
     conda activate rplots
@@ -453,7 +459,7 @@ We create a histogram of the read length distribution to clearly understand whic
 
 ### Plotting nucleotide enrichment of the reads
 
-Since the reads from Damage-seq and XR-seq data are expected to contain C and T nucleotides in certain positions, we plot the nucleotide enrichment in each position in reads. This also is used as a proof of data quality. 
+Because Damage-seq and XR-seq have characteristic sequence features, plot per-position nucleotide enrichment as a quality check.
 
 ```R
 library(ggplot2)
@@ -478,7 +484,7 @@ ggsave("results/xrNuclPlot.png", xrNuclPlot, width = 8, height = 4, dpi = 150)
 
 ### Bam correlations
 
-Another way to assess the data quality is to compare samples and replicates. Replicates should be alike in terms of genomic distribution of their reads while, for example, CPD samples should be different than (6-4)PP samples.
+Assess data quality by comparing replicates and conditions. Replicates should correlate well; different damage types/products should show distinct profiles.
 
 ```bash
     conda activate deeptools
@@ -490,12 +496,12 @@ Another way to assess the data quality is to compare samples and replicates. Rep
 
 ### Plotting read distribution on genes
 
-[deepTools](https://deeptools.readthedocs.io/en/develop/) is an easy way to plot read distribution in certain genomic regions. This tool uses the BigWig files to count the reads in genomic windows and requires the regions of interest in BED format. To plot a line graph of the read  distribution on genes:
+[deepTools](https://deeptools.readthedocs.io/en/develop/) summarizes coverage across regions (e.g., genes). Provide BigWigs and a BED of regions of interest:
 
 ```bash
     bigwigCompare --bigwig1 results/xr.plus.bw --bigwig2 results/xr.sim.plus.bw --operation ratio --outFileFormat bigwig --outFileName results/xr.norm_sim.plus.bw
 
-    computeMatrix scale-regions -S results/xr.norm_sim.plus.bw -R ref_genome/GRCh38_genes.bed --outFileName results/xr.norm_sim.plus.on_genes.computeMatrix.out -b 1000 -a 1000 --smartLabels
+    computeMatrix scale-regions -S results/xr.norm_sim.plus.bw -R ref_genome/Celegans_genes.bed --outFileName results/xr.norm_sim.plus.on_genes.computeMatrix.out -b 1000 -a 1000 --smartLabels
 
     plotHeatmap --matrixFile results/xr.norm_sim.plus.on_genes.computeMatrix.out --outFileName results/xr.norm_sim.plus.on_genes.heatmap_k2.png --xAxisLabel "Position with respect to genes" --yAxisLabel "Genes" --kmeans 2 --heatmapWidth 10 --startLabel "Start" --endLabel "End"
 ```
@@ -507,4 +513,3 @@ If you prefer an automated version of the steps in this tutorial, see the Snakem
 - Repository: [CompGenomeLab/xr-ds-seq-snakemake](https://github.com/CompGenomeLab/xr-ds-seq-snakemake)
 
 It orchestrates genome preparation, QC, adapter handling, alignment, BED conversions, Damage-seq motif filtering, coverage track generation, simulations, and downstream summaries. Use it when you need a fully reproducible, end-to-end run with minimal manual intervention.
-

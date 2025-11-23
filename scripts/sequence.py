@@ -88,7 +88,7 @@ class reMotif(object):
 				return dictionary[key]
 			return key
 		if reverseFlag: # Use with caution. It doesn't work for non-symmetric patterns like: .{3}ATG.{4} will give .{3}GTA.{4}
-			string = reverse(self.getPatternAsString())
+			string = self.reverse().getPatternAsString()
 		else:
 			string = self.getPatternAsString()
 		return reMotif("".join([complementIfPossibe(base, kDNAcomplementaryDictionary) for base in string]))

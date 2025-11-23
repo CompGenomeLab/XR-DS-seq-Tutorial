@@ -149,12 +149,12 @@ class fasta:
 			for i in range(min(firstNletters,len(sequence)) - (kmer - 1)):
 				subseq = sequence[i : i + kmer]
 				if subseqHasValidNucleotides(subseq):
-						 theDict[i + 1][subseq.upper()] += 1
+							theDict[i + 1][subseq.upper()] += 1
 
-		if firstNletters == None:
-			firstNletters = self.getMaxSeqLength()
-		else:
-			firstNletters = int(firstNletters)
+			if firstNletters is None:
+				firstNletters = self.getMaxSeqLength()
+			else:
+				firstNletters = int(firstNletters)
 
 		positionDict = {}
 		for i in range(1, firstNletters + 1 - (kmer - 1)):
@@ -194,12 +194,12 @@ class fasta:
 			for i in range(min(firstNletters,len(sequence)) - (kmer - 1)):
 				subseq = sequence[i : i + kmer]
 				if subseqHasValidNucleotides(subseq):
-						 theDict[i + 1][subseq.upper()] += 1
+							theDict[i + 1][subseq.upper()] += 1
 
-		if firstNletters == None:
-			firstNletters = self.getMaxSeqLength()
-		else:
-			firstNletters = int(firstNletters)
+			if firstNletters is None:
+				firstNletters = self.getMaxSeqLength()
+			else:
+				firstNletters = int(firstNletters)
 
 		positionDict = {}
 		for i in range(1, firstNletters + 1 - (kmer - 1)):
@@ -230,7 +230,7 @@ class fasta:
 			for i in range(min(firstNletters,len(sequence))):
 				letter = sequence[i]
 				if letterIsValidNucleotide(letter):
-						 theDict[i + 1][letter.upper()] += 1
+							theDict[i + 1][letter.upper()] += 1
 
 		positionDict = {}
 		for i in range(1, firstNletters + 1):
