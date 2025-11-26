@@ -11,7 +11,6 @@ Prerequisites:
 - Linux environment is recommended. If you are not on Linux, please follow our WSL setup guide: [wsl_vscode_github.pdf](wsl_vscode_github.pdf).
 - [Visual Studio Code](https://code.visualstudio.com/) is highly recommended (not mandatory) for the exercises and file navigation.
 - Conda environments should be installed and ready-to-use (see [ENVIRONMENTS.md](ENVIRONMENTS.md)).
-- R is required for plotting. Recommended: use VS Code with the [R extension](https://marketplace.visualstudio.com/items?itemName=REditorSupport.r). Alternatively, install [R](https://www.r-project.org/) and [RStudio Desktop](https://posit.co/download/rstudio-desktop/).
 
 Outline:
 
