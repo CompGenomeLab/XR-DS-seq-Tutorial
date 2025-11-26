@@ -392,8 +392,13 @@ Then, from these BedGraph files, we generate BigWig files.
 Because CPD and (6-4)PP damage types require certain nucleotides in certain positions, the genomic locations rich in adjacent CC, TC, CT or TT dinucleotides may be prone to receiving more UV damage while other regions that are poor in these dinucleotides receive less damage. Therefore, the sequence contents may bias our analysis results while comparing the damage formation or NER efficiency of two genomic regions. In order to eliminate the effect of  sequence content, we create synthetic sequencing data from the real Damage-seq and XR-seq data, which give us the expected damage counts and NER efficiencies, respectively, from the sequence content of the genomic areas of interest. We use [Boquila](https://github.com/CompGenomeLab/boquila) to generate simulated data.
 
 ```bash
-    conda activate boquila
+    conda activate bedops
+    bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/ds.dipy.bed -fo results/ds.dipy.fa -s
 
+    awk '($3-$2==24){print}' results/xr.sorted.chr.bed > results/xr.sorted.24.bed
+    bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/xr.sorted.24.bed -fo results/xr.fa -s
+
+    conda activate boquila
     boquila --fasta results/ds.dipy.fa --bed results/ds.sim.bed --ref ref_genome/GCF_000002985.6_WBcel235_genomic.fna --regions ref_genome/WBcel235.ron --kmer 2 --seed 1 > results/ds.sim.fa
 
     boquila --fasta results/xr.fa --bed results/xr.sim.bed --ref ref_genome/GCF_000002985.6_WBcel235_genomic.fna --regions ref_genome/WBcel235.ron --kmer 2 --seed 1 > results/xr.sim.fa
@@ -449,11 +454,6 @@ We check the reads for the enrichment of nucleotides and dinucleotides at specif
 
 ```bash
     conda activate bedops
-    bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/ds.dipy.bed -fo results/ds.dipy.fa -s
-
-    awk '($3-$2==24){print}' results/xr.sorted.chr.bed > results/xr.sorted.24.bed
-    bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/xr.sorted.24.bed -fo results/xr.fa -s
-
     python3 scripts/fa2kmerAbundanceTable.py -i results/ds.dipy.fa -k 1 -o results/ds.dipy.nt.txt
     python3 scripts/fa2kmerAbundanceTable.py -i results/ds.dipy.fa -k 2 -o results/ds.dipy.di.txt
 
