@@ -174,6 +174,7 @@ A nice [github page](https://hbctraining.github.io/Intro-to-rnaseq-hpc-salmon/le
 Activate the `fastqc` environment:
 
 ```bash
+conda deactivate
 conda activate fastqc
 ```
 
@@ -192,6 +193,7 @@ multiqc qc/ -o qc/
 This section demonstrates how to handle adapters in NGS data using cutadapt, a tool for trimming adapter sequences and other contaminants. Activate the `trimming` environment:
 
 ```bash
+conda deactivate
 conda activate trimming
 ```
 
@@ -212,6 +214,7 @@ This section covers the steps involved in mapping the preprocessed reads to the 
 Activate the `mapping` environment (includes bowtie2, samtools, picard):
 
 ```bash
+conda deactivate
 conda activate mapping
 ```
 
@@ -255,6 +258,7 @@ samtools index results/xr.dedup.bam
 samtools view -q 20 -b results/xr.dedup.bam > results/xr.q20.bam
 
 # Bedops env for BED conversion
+conda deactivate
 conda activate bedops
 bedtools bamtobed -i results/ds.q20.bam > results/ds.bed
 bedtools bamtobed -i results/xr.q20.bam > results/xr.bed
@@ -378,6 +382,7 @@ Then, from these BedGraph files, we generate BigWig files.
 
 ```bash
     # Convert to BigWig (ucsc env)
+    conda deactivate
     conda activate ucsc
     bedGraphToBigWig results/ds.dipy.plus.sorted.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/ds.dipy.plus.bw
     bedGraphToBigWig results/ds.dipy.minus.sorted.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/ds.dipy.minus.bw
@@ -391,12 +396,14 @@ Then, from these BedGraph files, we generate BigWig files.
 Because CPD and (6-4)PP damage types require certain nucleotides in certain positions, the genomic locations rich in adjacent CC, TC, CT or TT dinucleotides may be prone to receiving more UV damage while other regions that are poor in these dinucleotides receive less damage. Therefore, the sequence contents may bias our analysis results while comparing the damage formation or NER efficiency of two genomic regions. In order to eliminate the effect of  sequence content, we create synthetic sequencing data from the real Damage-seq and XR-seq data, which give us the expected damage counts and NER efficiencies, respectively, from the sequence content of the genomic areas of interest. We use [Boquila](https://github.com/CompGenomeLab/boquila) to generate simulated data.
 
 ```bash
+    conda deactivate
     conda activate bedops
     bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/ds.dipy.bed -fo results/ds.dipy.fa -s
 
     awk '($3-$2==24){print}' results/xr.sorted.chr.bed > results/xr.sorted.24.bed
     bedtools getfasta -fi ref_genome/GCF_000002985.6_WBcel235_genomic.fna -bed results/xr.sorted.24.bed -fo results/xr.fa -s
 
+    conda deactivate
     conda activate boquila
     boquila --fasta results/ds.dipy.fa --bed results/ds.sim.bed --ref ref_genome/GCF_000002985.6_WBcel235_genomic.fna --regions ref_genome/WBcel235.ron --kmer 2 --seed 1 > results/ds.sim.fa
 
@@ -416,11 +423,13 @@ The read counts from the simulated Damage-seq and XR-seq data are then used to n
 ```bash
     grep -c '^' results/xr.sim.bed > results/xr.sim.count.txt
 
+    conda deactivate
     conda activate bedops
     sort -k1,1 -k2,2n results/xr.sim.plus.bed | grep -v "^chrDiscard" | bedtools genomecov -i - -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.plus.bdg
     
     sort -k1,1 -k2,2n results/xr.sim.minus.bed | grep -v "^chrDiscard" | bedtools genomecov -i - -g ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai -bg -scale $(cat results/xr.sim.count.txt | awk '{print 1000000/$1}') > results/xr.sim.minus.bdg
 
+    conda deactivate
     conda activate ucsc
     bedGraphToBigWig results/xr.sim.plus.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/xr.sim.plus.bw
     bedGraphToBigWig results/xr.sim.minus.bdg ref_genome/GCF_000002985.6_WBcel235_genomic.fna.fai results/xr.sim.minus.bw
@@ -433,6 +442,7 @@ The read counts from the simulated Damage-seq and XR-seq data are then used to n
 Plot a histogram of read lengths to confirm expected fragment sizes for XR/DS libraries.
 
 ```bash
+    conda deactivate
     conda activate rplots
 ```
 
@@ -452,6 +462,7 @@ Plot a histogram of read lengths to confirm expected fragment sizes for XR/DS li
 We check the reads for the enrichment of nucleotides and dinucleotides at specific positions.
 
 ```bash
+    conda deactivate
     conda activate bedops
     python3 scripts/fa2kmerAbundanceTable.py -i results/ds.dipy.fa -k 1 -o results/ds.dipy.nt.txt
     python3 scripts/fa2kmerAbundanceTable.py -i results/ds.dipy.fa -k 2 -o results/ds.dipy.di.txt
@@ -463,6 +474,7 @@ We check the reads for the enrichment of nucleotides and dinucleotides at specif
 Because Damage-seq and XR-seq have characteristic sequence features, plot per-position nucleotide enrichment as a quality check.
 
 ```bash
+    conda deactivate
     conda activate rplots
     Rscript scripts/plot_kmer_content.R -i results/xr.nt.txt -k 1 -o results/xr_nuc.png -s "XR-seq nucleotide content" -l results/xr_nuc.log
     Rscript scripts/plot_kmer_content.R -i results/ds.dipy.nt.txt -k 1 -o results/ds_nuc.png -s "DS-seq nucleotide content" -l results/ds_nuc.log
@@ -476,6 +488,7 @@ Because Damage-seq and XR-seq have characteristic sequence features, plot per-po
 Assess data quality by comparing replicates and conditions. Replicates should correlate well; different damage types/products should show distinct profiles.
 
 ```bash
+    conda deactivate
     conda activate deeptools
 
     multiBamSummary bins --bamfiles results/ds.dedup.bam results/xr.dedup.bam --minMappingQuality 20 --outFileName results/bamSummary.npz
