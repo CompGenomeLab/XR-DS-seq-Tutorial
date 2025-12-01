@@ -455,6 +455,7 @@ Plot a histogram of read lengths to confirm expected fragment sizes for XR/DS li
         xlab("Read length") +
         ylab("Read count")
     ggsave("results/xrLenDistPlot.png")
+    q()
 ```
 
 ### Assessing and Plotting nucleotide enrichment of the reads
