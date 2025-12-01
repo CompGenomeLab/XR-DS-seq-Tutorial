@@ -55,6 +55,9 @@ Damage-seq maps DNA lesions (e.g., CPD, (6-4)PP) by capturing polymerase-arreste
 - Hu, J., Li, W., Adebali, O., et al. Genome-wide mapping of nucleotide excision repair with XR-seq. Nature Protocols 14, 248–282 (2019). A detailed, step-by-step XR-seq laboratory and analysis protocol with practical considerations and preliminary analysis examples.  
   Link: <https://www.nature.com/articles/s41596-018-0093-7>
 
+- Hu, J., Adebali, O., Adar, S., & Sancar, A. (2017). Dynamic maps of UV damage formation and repair for the human genome. Proceedings of the National Academy of Sciences, 114(26), 6758-6763. Damage-Seq Methodology Paper
+  Link: <https://www.pnas.org/doi/10.1073/pnas.1706522114>
+
 - Hu, J., Adar, S., Selby, C. P., Lieb, J. D. & Sancar, A. Genome-wide analysis of human global and transcription-coupled excision repair of UV damage at single-nucleotide resolution. Genes & Development 29, 948–960 (2015). Introduces single-nucleotide–resolution repair maps, separating global and transcription-coupled repair components in human cells.  
   Link: <https://genesdev.cshlp.org/content/29/9/948>
 
@@ -121,6 +124,26 @@ This section explains the file formats that you will encounter throughout the tu
   - BigWig files store the data in a binary format and include additional indexing information for quick retrieval of data within specific genomic regions.
   - They are commonly used for visualizing and analyzing genome-wide data in genome browsers or for performing quantitative analyses across different genomic regions.
   - BigWig files can be generated from BEDGRAPH files using tools like bedGraphToBigWig or through conversion from other formats like BAM or WIG.
+
+
+## Initializing Git
+If you have never used git commands on your local computer, go to your terminal and run the following.
+
+```bash
+git config --global user.email "EMAIL USED FOR GITHUB"
+git config --global user.name "GITHUB USER NAME"
+```
+
+## Clone GitHub Repository
+
+```bash
+git clone https://github.com/CompGenomeLab/XR-DS-seq-Tutorial.git
+```
+
+Navigate to the cloned directiory.
+```bash
+cd XR-DS-seq-Tutorial/
+```
 
 ## Create conda environments
 
@@ -222,11 +245,11 @@ Initially we will align our reads to the reference genome using the prepared ind
 After that we will convert the output sam files to bam.
 
 ```bash
-(bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_Celegans -U results/ds.trim.fastq.gz -S results/ds.sam)
+bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_Celegans -U results/ds.trim.fastq.gz -S results/ds.sam
 
 samtools view -Sbh -o results/ds.bam results/ds.sam
 
-(bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_Celegans -U results/xr.trim.fastq.gz -S results/xr.sam)
+bowtie2 --threads 8 --seed 1 --reorder -x ref_genome/Bowtie2/genome_Celegans -U results/xr.trim.fastq.gz -S results/xr.sam
 
 samtools view -Sbh -o results/xr.bam results/xr.sam
 ```
@@ -242,9 +265,9 @@ samtools sort -o results/ds.sort.bam results/ds.bam -@ 8 -T results/
 
 samtools sort -o results/xr.sort.bam results/xr.bam -@ 8 -T results/
 
-(picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/ds.sort.bam --TMP_DIR results/ --OUTPUT results/ds.dedup.bam --METRICS_FILE results/ds.dedup.metrics.txt)
+picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/ds.sort.bam --TMP_DIR results/ --OUTPUT results/ds.dedup.bam --METRICS_FILE results/ds.dedup.metrics.txt
 
-(picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/xr.sort.bam --TMP_DIR results/ --OUTPUT results/xr.dedup.bam --METRICS_FILE results/xr.dedup.metrics.txt)
+picard MarkDuplicates --REMOVE_DUPLICATES true --INPUT results/xr.sort.bam --TMP_DIR results/ --OUTPUT results/xr.dedup.bam --METRICS_FILE results/xr.dedup.metrics.txt
 ```
 
 Lastly, we will remove low quality reads (MAPQ score < 20) via samtools and
